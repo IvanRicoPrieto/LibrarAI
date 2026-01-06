@@ -190,6 +190,42 @@ python -m src.cli.ingest_library --force
 open http://localhost:6333/dashboard
 ```
 
+### Memoria Conversacional (Follow-up Questions)
+
+El modo interactivo soporta preguntas de seguimiento que mantienen contexto de la conversación anterior:
+
+```bash
+# Iniciar modo interactivo con memoria
+python -m src.cli.ask_library --interactive
+
+# Ejemplo de conversación:
+# ❓ Tu pregunta: ¿Qué es el algoritmo de Shor?
+# [respuesta sobre Shor]
+# ❓ Tu pregunta: ¿Y qué complejidad tiene?          # Sabe que hablas de Shor
+# ❓ Tu pregunta: Expande el punto 2                  # Amplía punto específico
+# ❓ Tu pregunta: Dame un ejemplo más detallado      # Más ejemplos del tema
+```
+
+**Comandos especiales del modo interactivo:**
+
+| Comando    | Descripción                          |
+| ---------- | ------------------------------------ |
+| `/sources` | Ver fuentes de la última respuesta   |
+| `/export`  | Exportar última respuesta a Markdown |
+| `/history` | Ver historial de conversación        |
+| `/new`     | Nueva sesión (borrar memoria)        |
+| `/clear`   | Limpiar pantalla                     |
+| `salir`    | Terminar sesión                      |
+
+**Tipos de preguntas de seguimiento soportadas:**
+
+- **Expansión**: "Más detalles", "Expande el punto 3", "Profundiza en esto"
+- **Clarificación**: "¿Qué significa X?", "¿Puedes aclarar eso?"
+- **Comparación**: "¿En qué se diferencia de Y?", "Compara con Z"
+- **Ejemplo**: "Dame un ejemplo", "¿Puedes ilustrar esto?"
+- **Continuación**: "¿Y después?", "¿Qué más?", "Continúa"
+- **Referencia**: "¿Y si cambio X?", "¿Qué pasa con Y?"
+
 ## 🏗️ Arquitectura
 
 ```

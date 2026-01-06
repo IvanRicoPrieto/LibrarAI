@@ -213,6 +213,71 @@ El grafo utiliza una ontología ampliada con 18 tipos de entidad y 19 tipos de r
 
 ---
 
+### 1b. Modo Interactivo con Memoria Conversacional
+
+El modo interactivo (`--interactive`) incluye memoria conversacional que permite preguntas de seguimiento naturales.
+
+#### Activar Modo Interactivo
+
+```bash
+cd "/home/ivan/Computación Cuántica/LibrarAI" && source .venv/bin/activate && python -m src.cli.ask_library --interactive
+```
+
+#### Comandos Especiales del Modo Interactivo
+
+| Comando    | Descripción                          |
+| ---------- | ------------------------------------ |
+| `/sources` | Ver fuentes de la última respuesta   |
+| `/export`  | Exportar última respuesta a Markdown |
+| `/history` | Ver historial de conversación        |
+| `/new`     | Nueva sesión (borrar memoria)        |
+| `/clear`   | Limpiar pantalla                     |
+| `salir`    | Terminar sesión                      |
+
+#### Tipos de Preguntas de Seguimiento
+
+El sistema detecta automáticamente preguntas de seguimiento y las expande con contexto:
+
+| Tipo              | Ejemplos                                    | Acción                           |
+| ----------------- | ------------------------------------------- | -------------------------------- |
+| **Expansión**     | "Más detalles", "Expande el punto 2"        | Amplia respuesta anterior        |
+| **Clarificación** | "¿Qué significa X?", "¿Puedes aclarar eso?" | Clarifica concepto               |
+| **Comparación**   | "¿En qué se diferencia de Y?"               | Busca comparación con contexto   |
+| **Ejemplo**       | "Dame un ejemplo", "Ilustra esto"           | Genera ejemplos del tema actual  |
+| **Continuación**  | "¿Y después?", "¿Qué más?", "Continúa"      | Continúa explicación             |
+| **Referencia**    | "¿Y si cambio X?", "¿Qué pasa con Y?"       | Varía parámetros del tema actual |
+
+#### Ejemplo de Conversación
+
+```
+❓ Tu pregunta: ¿Qué es el algoritmo de Shor?
+🤖 [Respuesta sobre el algoritmo de Shor]
+
+❓ Tu pregunta: ¿Y qué complejidad tiene?
+📝 Interpretado como: ¿Qué complejidad tiene el algoritmo de Shor?
+🤖 [Respuesta sobre complejidad]
+
+❓ Tu pregunta: Expande el punto 2
+📝 Interpretado como: Expande el punto 2 sobre la complejidad del algoritmo de Shor
+🤖 [Expansión del punto 2]
+
+❓ Tu pregunta: Compara con Grover
+📝 Interpretado como: Compara el algoritmo de Shor con el algoritmo de Grover
+🤖 [Comparación entre algoritmos]
+```
+
+#### Persistencia de Sesiones
+
+Las sesiones se guardan automáticamente en `outputs/sessions/`. Cada sesión incluye:
+
+- ID único de sesión
+- Timestamp de creación
+- Historial de mensajes (user/assistant)
+- Fuentes consultadas por mensaje
+- Metadata del modelo usado
+
+---
+
 ### 2. Indexar Biblioteca (`ingest_library`)
 
 **Propósito:** Procesar y indexar documentos en el sistema RAG.

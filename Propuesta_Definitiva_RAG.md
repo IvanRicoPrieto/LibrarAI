@@ -33,6 +33,7 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 | **Citas**        | Rutas de encabezado (ej: `Libro > Cap 3 > Sec 3.2`)         |
 | **Verificación** | Evaluación automática de fidelidad pre-entrega              |
 | **Privacidad**   | Datos 100% locales, solo APIs para LLM de generación        |
+| **Memoria**      | Conversacional: follow-up questions, expansión con contexto |
 
 ### 1.3 Stack Tecnológico Recomendado
 
@@ -438,9 +439,91 @@ sequenceDiagram
 
 ---
 
+## 6B. Memoria Conversacional
+
+### 6B.1 Objetivo
+
+Permitir conversaciones multi-turno donde preguntas de seguimiento mantienen contexto:
+
+```
+👤 ¿Qué es el algoritmo de Shor?
+🤖 [Explicación de Shor...]
+
+👤 ¿Y qué complejidad tiene?  # Sabe que se refiere a Shor
+📝 Interpretado como: "¿Qué complejidad tiene el algoritmo de Shor?"
+```
+
+### 6B.2 Arquitectura del Session Manager
+
+```python
+@dataclass
+class Message:
+    role: Literal["user", "assistant"]
+    content: str
+    timestamp: datetime
+    sources: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class ConversationContext:
+    session_id: str
+    created_at: datetime
+    messages: List[Message]
+    topics: List[str]  # Temas detectados
+
+class SessionManager:
+    def create_session() -> str
+    def add_message(session_id, role, content, sources, metadata)
+    def is_followup_query(query, session_id) -> Tuple[bool, str]
+    def expand_query_with_context(query, session_id, followup_type) -> str
+    def get_conversation_summary(session_id) -> str
+```
+
+### 6B.3 Detección de Preguntas de Seguimiento
+
+Patrones detectados automáticamente:
+
+| Tipo | Patrones | Acción |
+|------|----------|--------|
+| **Expansión** | "más detalles", "expande el punto X" | Amplia respuesta anterior |
+| **Clarificación** | "qué significa", "puedes aclarar" | Clarifica concepto |
+| **Comparación** | "diferencia de", "compara con" | Busca comparación |
+| **Ejemplo** | "dame un ejemplo", "ilustra" | Genera ejemplos |
+| **Continuación** | "y después", "qué más", "continúa" | Sigue explicando |
+| **Referencia** | "y si cambio", "qué pasa con" | Varía parámetros |
+
+### 6B.4 Expansión de Query con Contexto
+
+Cuando se detecta followup, se expande la query:
+
+```python
+# Query original: "¿Y qué complejidad tiene?"
+# Contexto: último mensaje sobre "algoritmo de Shor"
+# Query expandida: "¿Qué complejidad tiene el algoritmo de Shor?"
+```
+
+### 6B.5 Persistencia de Sesiones
+
+Las sesiones se guardan en `outputs/sessions/` como JSON:
+
+```json
+{
+  "session_id": "abc123...",
+  "created_at": "2026-01-02T14:35:22",
+  "messages": [
+    {"role": "user", "content": "¿Qué es Shor?", "timestamp": "..."},
+    {"role": "assistant", "content": "El algoritmo...", "sources": ["chunk_1"]}
+  ],
+  "topics": ["algoritmo de Shor", "factorización"]
+}
+```
+
+---
+
 ## 7. Observabilidad y Logging
 
 ### 7.1 Capas de Logging
+
 
 | Capa | Qué se registra | Herramienta |
 |------|-----------------|-------------|
@@ -736,7 +819,8 @@ quantum_library_rag/
 │   ├── agents/
 │   │   ├── router.py          # Clasificación + pesos dinámicos
 │   │   ├── planner.py         # Descomposición
-│   │   └── critic.py          # Verificación
+│   │   ├── critic.py          # Verificación
+│   │   └── session_manager.py # Memoria conversacional
 │   │
 │   └── cli/
 │       ├── ask_library.py     # Punto de entrada CLI
@@ -746,7 +830,8 @@ quantum_library_rag/
 │   └── sessions/              # Logs de cada consulta
 │
 ├── outputs/
-│   └── figures/               # Gráficas generadas (si aplica)
+│   ├── figures/               # Gráficas generadas (si aplica)
+│   └── sessions/              # Sesiones de conversación persistidas
 │
 ├── tests/
 │   └── test_retrieval.py
@@ -874,12 +959,13 @@ FASE 5: AGENTES (Día 8-9)
 ├── 5.1 Implementar router (clasificación)
 ├── 5.2 Implementar planner (descomposición)
 ├── 5.3 Implementar loop de Deep Research
-└── 5.4 Tests end-to-end
+├── 5.4 Implementar session_manager (memoria conversacional)
+└── 5.5 Tests end-to-end
 
 FASE 6: CLI E INTEGRACIÓN (Día 10)
 ├── 6.1 Implementar CLI con argparse
 ├── 6.2 Formatear salida Markdown
-├── 6.3 Añadir modo verbose
+├── 6.3 Añadir modo interactivo con memoria
 ├── 6.4 Configurar alias/shortcuts
 └── 6.5 Documentación de uso
 ```
