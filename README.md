@@ -147,6 +147,22 @@ python -m src.cli.ask_library "¿Qué es un qubit?" --filter category:computacio
 python -m src.cli.ask_library "BB84" --filter category:comunicacion_cuantica --filter doc_title:Nielsen
 ```
 
+### Qdrant en Docker (Recomendado para >20K chunks)
+
+```bash
+# Iniciar Qdrant en Docker
+docker compose up -d
+
+# Configurar URL en .env
+echo "QDRANT_URL=http://localhost:6333" >> .env
+
+# Re-indexar la biblioteca (migrará a Docker)
+python -m src.cli.ingest_library --force
+
+# Acceder al dashboard
+open http://localhost:6333/dashboard
+```
+
 ## 🏗️ Arquitectura
 
 ```

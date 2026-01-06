@@ -3,12 +3,13 @@ Indexador de Biblioteca - Crea índices vectoriales, BM25 y grafo.
 
 Este módulo se encarga de:
 1. Generar embeddings para chunks
-2. Almacenar en Qdrant (vector DB)
+2. Almacenar en Qdrant (vector DB) - local o remoto (Docker/Cloud)
 3. Construir índice BM25 para búsqueda léxica
 4. Construir grafo de conocimiento (opcional)
 5. Gestionar manifest para indexación incremental
 """
 
+import os
 import json
 import pickle
 import hashlib
@@ -103,7 +104,8 @@ class LibraryIndexer:
         embedding_model: str = "text-embedding-3-large",
         embedding_dimensions: int = 1536,
         qdrant_collection: str = "quantum_library",
-        use_graph: bool = True
+        use_graph: bool = True,
+        qdrant_url: str = None
     ):
         """
         Args:
@@ -113,6 +115,7 @@ class LibraryIndexer:
             embedding_dimensions: Dimensiones del vector
             qdrant_collection: Nombre de la colección en Qdrant
             use_graph: Si crear grafo de conocimiento
+            qdrant_url: URL de Qdrant remoto (ej: http://localhost:6333). Si None, usa local.
         """
         self.indices_dir = Path(indices_dir)
         self.indices_dir.mkdir(parents=True, exist_ok=True)
@@ -122,6 +125,7 @@ class LibraryIndexer:
         self.embedding_dimensions = embedding_dimensions
         self.qdrant_collection = qdrant_collection
         self.use_graph = use_graph
+        self.qdrant_url = qdrant_url or os.getenv("QDRANT_URL")
         
         # Rutas de archivos
         self.manifest_path = self.indices_dir / "manifest.json"
@@ -157,7 +161,7 @@ class LibraryIndexer:
             json.dump(self.manifest.to_dict(), f, indent=2)
     
     def _init_qdrant(self):
-        """Inicializa cliente de Qdrant."""
+        """Inicializa cliente de Qdrant (local o remoto)."""
         if self._qdrant_client is not None:
             return
         
@@ -167,11 +171,16 @@ class LibraryIndexer:
                 Distance, VectorParams, PointStruct
             )
             
-            # Usar almacenamiento local
-            qdrant_path = self.indices_dir / "qdrant"
-            qdrant_path.mkdir(exist_ok=True)
-            
-            self._qdrant_client = QdrantClient(path=str(qdrant_path))
+            if self.qdrant_url:
+                # Conexión remota (Docker o cloud)
+                self._qdrant_client = QdrantClient(url=self.qdrant_url)
+                logger.info(f"Conectado a Qdrant remoto: {self.qdrant_url}")
+            else:
+                # Almacenamiento local (file-based)
+                qdrant_path = self.indices_dir / "qdrant"
+                qdrant_path.mkdir(exist_ok=True)
+                self._qdrant_client = QdrantClient(path=str(qdrant_path))
+                logger.debug("Qdrant local inicializado")
             
             # Crear colección si no existe
             collections = self._qdrant_client.get_collections().collections

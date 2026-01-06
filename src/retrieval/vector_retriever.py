@@ -6,8 +6,10 @@ Características:
 - Soporte para filtros de metadatos
 - Auto-merge de chunks jerárquicos
 - Cache de embeddings para reducir costes 70-90%
+- Soporte para Qdrant local o remoto (Docker/Cloud)
 """
 
+import os
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field
@@ -49,7 +51,8 @@ class VectorRetriever:
         embedding_provider: str = "openai",
         embedding_model: str = "text-embedding-3-large",
         collection_name: str = "quantum_library",
-        use_cache: bool = True
+        use_cache: bool = True,
+        qdrant_url: str = None
     ):
         """
         Args:
@@ -58,12 +61,14 @@ class VectorRetriever:
             embedding_model: Modelo de embeddings
             collection_name: Nombre de colección en Qdrant
             use_cache: Habilitar cache de embeddings
+            qdrant_url: URL de Qdrant remoto (ej: http://localhost:6333). Si None, usa local.
         """
         self.indices_dir = Path(indices_dir)
         self.embedding_provider = embedding_provider
         self.embedding_model = embedding_model
         self.collection_name = collection_name
         self.use_cache = use_cache
+        self.qdrant_url = qdrant_url or os.getenv("QDRANT_URL")
         
         self._qdrant_client = None
         self._embedding_client = None
@@ -71,15 +76,21 @@ class VectorRetriever:
         self._embedding_cache = None
     
     def _init_qdrant(self):
-        """Inicializa cliente de Qdrant."""
+        """Inicializa cliente de Qdrant (local o remoto)."""
         if self._qdrant_client is not None:
             return
         
         from qdrant_client import QdrantClient
         
-        qdrant_path = self.indices_dir / "qdrant"
-        self._qdrant_client = QdrantClient(path=str(qdrant_path))
-        logger.debug("Qdrant inicializado")
+        if self.qdrant_url:
+            # Conexión remota (Docker o cloud)
+            self._qdrant_client = QdrantClient(url=self.qdrant_url)
+            logger.debug(f"Qdrant remoto inicializado: {self.qdrant_url}")
+        else:
+            # Conexión local (file-based)
+            qdrant_path = self.indices_dir / "qdrant"
+            self._qdrant_client = QdrantClient(path=str(qdrant_path))
+            logger.debug("Qdrant local inicializado")
     
     def _init_embeddings(self):
         """Inicializa cliente de embeddings."""
