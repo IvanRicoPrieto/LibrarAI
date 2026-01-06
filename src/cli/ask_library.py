@@ -266,7 +266,8 @@ class RAGPipeline:
         use_router: bool = True,
         use_critic: bool = False,
         use_reranker: bool = False,
-        reranker_preset: str = "balanced"
+        reranker_preset: str = "balanced",
+        use_cache: bool = True
     ):
         self.indices_dir = indices_dir
         self.config = config
@@ -275,6 +276,7 @@ class RAGPipeline:
         self.use_critic = use_critic
         self.use_reranker = use_reranker
         self.reranker_preset = reranker_preset
+        self.use_cache = use_cache
         
         # Componentes (lazy init)
         self._retriever = None
@@ -307,7 +309,8 @@ class RAGPipeline:
             graph_weight=retrieval_config.get("graph_weight", 0.2),
             use_graph=self.config.get("graph", {}).get("enabled", True),
             use_reranker=use_reranker,
-            reranker_preset=reranker_preset
+            reranker_preset=reranker_preset,
+            use_cache=self.use_cache
         )
         
         gen_config = self.config.get("generation", {})
@@ -821,6 +824,18 @@ Ejemplos:
     )
     
     parser.add_argument(
+        '--no-cache',
+        action='store_true',
+        help='Deshabilitar cache de embeddings'
+    )
+    
+    parser.add_argument(
+        '--cache-stats',
+        action='store_true',
+        help='Mostrar estadísticas del cache de embeddings'
+    )
+    
+    parser.add_argument(
         '--costs', '-c',
         action='store_true',
         help='Mostrar resumen de costes acumulados de consultas'
@@ -840,6 +855,22 @@ Ejemplos:
             tracker.print_summary()  # Sin filtro, muestra todo
         except Exception as e:
             print(f"❌ Error mostrando costes: {e}")
+        sys.exit(0)
+    
+    # Si solo pide estadísticas de cache, mostrar y salir
+    if args.cache_stats and not args.query and not args.interactive:
+        try:
+            paths = setup_paths()
+            from ..retrieval.cache import EmbeddingCache
+            cache = EmbeddingCache(indices_dir=paths["indices_dir"])
+            stats = cache.get_stats()
+            print("\n📊 Estadísticas del Cache de Embeddings")
+            print("=" * 45)
+            for key, value in stats.items():
+                print(f"  {key}: {value}")
+            cache.close()
+        except Exception as e:
+            print(f"❌ Error mostrando estadísticas de cache: {e}")
         sys.exit(0)
     
     # Verificar que hay query o modo interactivo
@@ -886,7 +917,8 @@ Ejemplos:
             use_router=not args.no_router,
             use_critic=args.critic,
             use_reranker=args.rerank,
-            reranker_preset=args.rerank_preset
+            reranker_preset=args.rerank_preset,
+            use_cache=not args.no_cache
         )
     except Exception as e:
         logger.error(f"Error inicializando pipeline: {e}")

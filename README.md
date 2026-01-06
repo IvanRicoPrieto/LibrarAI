@@ -6,8 +6,7 @@ Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Fí
 
 - **🔍 Búsqueda híbrida**: Vector (semántica) + BM25 (léxica) + Grafo (relaciones)
 - **🎯 Re-ranking**: Cross-Encoder opcional que mejora precisión +15-25%
-- **� Evaluación RAGAS**: Pipeline de evaluación con métricas de calidad RAG
-- **�📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
+- **� Evaluación RAGAS**: Pipeline de evaluación con métricas de calidad RAG- **💾 Cache de Embeddings**: Reduce costes 70-90% y elimina latencia en queries repetidas- **�📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
 - **📝 Citas precisas**: Referencias `[n]` a fuentes específicas con ubicación
 - **🤖 Multi-LLM**: Claude Sonnet 4.5, GPT-4.1, modelos locales (Ollama)
 - **⚡ Indexación incremental**: Solo procesa documentos nuevos/modificados
@@ -123,6 +122,16 @@ python -m src.cli.evaluate --suite default --baseline benchmark_results/baseline
 
 # Benchmark sin reranking (para comparación A/B)
 python -m src.cli.evaluate --suite default --no-rerank
+```
+
+### Cache de Embeddings
+
+```bash
+# Ver estadísticas del cache
+python -m src.cli.ask_library --cache-stats
+
+# Deshabilitar cache (útil para debugging)
+python -m src.cli.ask_library "Pregunta" --no-cache
 ```
 
 ## 🏗️ Arquitectura

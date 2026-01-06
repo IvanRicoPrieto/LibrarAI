@@ -288,6 +288,7 @@ class UnifiedRetriever:
     - Búsqueda híbrida (vector + BM25 + grafo)
     - Configuración de pesos
     - Re-ranking opcional con cross-encoder
+    - Cache de embeddings para reducir costes
     """
     
     def __init__(
@@ -298,7 +299,8 @@ class UnifiedRetriever:
         graph_weight: float = 0.2,
         use_graph: bool = True,
         use_reranker: bool = False,
-        reranker_preset: str = "balanced"  # "fast", "balanced", "quality", "max_quality"
+        reranker_preset: str = "balanced",  # "fast", "balanced", "quality", "max_quality"
+        use_cache: bool = True
     ):
         """
         Args:
@@ -309,6 +311,7 @@ class UnifiedRetriever:
             use_graph: Si usar retriever de grafo
             use_reranker: Si aplicar cross-encoder para re-ranking
             reranker_preset: Preset del reranker si use_reranker=True
+            use_cache: Si usar cache de embeddings
         """
         from pathlib import Path
         from .vector_retriever import VectorRetriever
@@ -318,9 +321,10 @@ class UnifiedRetriever:
         self.indices_dir = Path(indices_dir)
         self.use_graph = use_graph
         self.use_reranker = use_reranker
+        self.use_cache = use_cache
         
         # Inicializar retrievers
-        self.vector_retriever = VectorRetriever(self.indices_dir)
+        self.vector_retriever = VectorRetriever(self.indices_dir, use_cache=use_cache)
         self.bm25_retriever = BM25Retriever(self.indices_dir)
         self.graph_retriever = GraphRetriever(self.indices_dir) if use_graph else None
         
@@ -331,6 +335,10 @@ class UnifiedRetriever:
             graph_weight=graph_weight,
             reranker_preset=reranker_preset if use_reranker else None
         )
+    
+    def get_cache_stats(self) -> dict:
+        """Obtiene estadísticas del cache de embeddings."""
+        return self.vector_retriever.get_cache_stats()
     
     def search(
         self,

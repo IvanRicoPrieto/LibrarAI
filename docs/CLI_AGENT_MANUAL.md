@@ -66,6 +66,8 @@ source .venv/bin/activate && python -m src.cli.ask_library "PREGUNTA"
 | `--exec`          | -     | flag   | false    | Permitir ejecución de código (sandbox seguro)            |
 | `--rerank`        | -     | flag   | false    | Aplicar re-ranking con cross-encoder (+15-25% precisión) |
 | `--rerank-preset` | -     | choice | balanced | Preset: fast, balanced, quality, max_quality             |
+| `--no-cache`      | -     | flag   | false    | Deshabilitar cache de embeddings                         |
+| `--cache-stats`   | -     | flag   | false    | Mostrar estadísticas del cache                           |
 | `--costs`         | `-c`  | flag   | false    | Mostrar costes                                           |
 
 #### Ejemplos de Uso para Agentes
