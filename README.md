@@ -6,7 +6,8 @@ Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Fí
 
 - **🔍 Búsqueda híbrida**: Vector (semántica) + BM25 (léxica) + Grafo (relaciones)
 - **🎯 Re-ranking**: Cross-Encoder opcional que mejora precisión +15-25%
-- **📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
+- **� Evaluación RAGAS**: Pipeline de evaluación con métricas de calidad RAG
+- **�📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
 - **📝 Citas precisas**: Referencias `[n]` a fuentes específicas con ubicación
 - **🤖 Multi-LLM**: Claude Sonnet 4.5, GPT-4.1, modelos locales (Ollama)
 - **⚡ Indexación incremental**: Solo procesa documentos nuevos/modificados
@@ -106,6 +107,22 @@ python -m src.cli.ask_library "Deriva la ecuación de Schrödinger" --save
 
 # Salida JSON
 python -m src.cli.ask_library "¿Qué es un qubit?" --json
+```
+
+### Evaluación de Calidad (RAGAS)
+
+```bash
+# Evaluar una query individual
+python -m src.cli.evaluate --query "¿Qué es el entrelazamiento cuántico?"
+
+# Ejecutar benchmark completo
+python -m src.cli.evaluate --suite default
+
+# Comparar con baseline anterior
+python -m src.cli.evaluate --suite default --baseline benchmark_results/baseline.json
+
+# Benchmark sin reranking (para comparación A/B)
+python -m src.cli.evaluate --suite default --no-rerank
 ```
 
 ## 🏗️ Arquitectura

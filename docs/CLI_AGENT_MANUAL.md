@@ -209,6 +209,81 @@ cd "/home/ivan/Computación Cuántica/LibrarAI" && python -m src.cli.ingest_libr
 
 ---
 
+### 3. Evaluar Calidad RAG (`evaluate`)
+
+**Propósito:** Medir la calidad del sistema RAG con métricas RAGAS (faithfulness, relevancy, precision).
+
+#### Sintaxis Básica
+
+```bash
+python -m src.cli.evaluate --query "PREGUNTA"
+# o para benchmark completo:
+python -m src.cli.evaluate --suite default
+```
+
+#### Parámetros
+
+| Parámetro         | Corto | Tipo   | Default           | Descripción                                  |
+| ----------------- | ----- | ------ | ----------------- | -------------------------------------------- |
+| `--query`         | `-q`  | string | -                 | Query individual a evaluar                   |
+| `--ground-truth`  | -     | string | -                 | Respuesta esperada (para recall)             |
+| `--suite`         | `-s`  | string | -                 | Suite: `default` o ruta a JSON               |
+| `--baseline`      | -     | string | -                 | Ruta a resultados baseline para comparación  |
+| `--rerank`        | -     | flag   | true              | Habilitar re-ranking                         |
+| `--no-rerank`     | -     | flag   | false             | Deshabilitar re-ranking                      |
+| `--rerank-preset` | -     | choice | balanced          | Preset: fast, balanced, quality, max_quality |
+| `--eval-model`    | -     | string | gpt-4o-mini       | Modelo para evaluación                       |
+| `--output-dir`    | `-o`  | string | benchmark_results | Directorio de salida                         |
+| `--verbose`       | `-v`  | flag   | false             | Logging detallado                            |
+
+#### Métricas RAGAS
+
+| Métrica               | Descripción                                            | Rango |
+| --------------------- | ------------------------------------------------------ | ----- |
+| **Faithfulness**      | ¿La respuesta está basada en el contexto recuperado?   | 0-1   |
+| **Answer Relevancy**  | ¿La respuesta aborda la pregunta del usuario?          | 0-1   |
+| **Context Precision** | ¿Los chunks recuperados son relevantes para la query?  | 0-1   |
+| **Context Recall**    | ¿El contexto contiene info para la respuesta esperada? | 0-1   |
+
+#### Ejemplos para Agentes
+
+**Evaluar query individual:**
+
+```bash
+cd "/home/ivan/Computación Cuántica/LibrarAI" && source .venv/bin/activate && python -m src.cli.evaluate --query "¿Qué es el entrelazamiento cuántico?"
+```
+
+**Ejecutar benchmark estándar:**
+
+```bash
+cd "/home/ivan/Computación Cuántica/LibrarAI" && source .venv/bin/activate && python -m src.cli.evaluate --suite default
+```
+
+**Comparar con/sin re-ranking (A/B test):**
+
+```bash
+# Con reranking (guardar como baseline)
+cd "/home/ivan/Computación Cuántica/LibrarAI" && source .venv/bin/activate && python -m src.cli.evaluate --suite default -o benchmark_results/with_rerank
+
+# Sin reranking (comparar)
+cd "/home/ivan/Computación Cuántica/LibrarAI" && source .venv/bin/activate && python -m src.cli.evaluate --suite default --no-rerank --baseline benchmark_results/with_rerank/results_*.json
+```
+
+**Benchmark con suite personalizada:**
+
+```bash
+cd "/home/ivan/Computación Cuántica/LibrarAI" && source .venv/bin/activate && python -m src.cli.evaluate --suite benchmarks/custom.json
+```
+
+#### Estructura de Salida
+
+El comando genera en `benchmark_results/`:
+
+- `report_YYYYMMDD_HHMMSS.md`: Informe legible con métricas agregadas
+- `results_YYYYMMDD_HHMMSS.json`: Resultados completos en JSON
+
+---
+
 ## 📊 Sistema de Costes
 
 El sistema registra automáticamente todos los costes de API en `logs/cost_tracking.csv`.

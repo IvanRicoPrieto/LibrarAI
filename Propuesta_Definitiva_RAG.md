@@ -25,6 +25,7 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 | **Integración**  | CLI directa en terminal/VS Code (sin MCP)             |
 | **Búsqueda**     | Híbrida: semántica (vectores) + léxica (BM25) + grafo |
 | **Re-ranking**   | Cross-Encoder opcional para +15-25% precisión         |
+| **Evaluación**   | Pipeline RAGAS: faithfulness, relevancy, precision    |
 | **Chunking**     | Jerárquico con auto-merge para contexto coherente     |
 | **Citas**        | Rutas de encabezado (ej: `Libro > Cap 3 > Sec 3.2`)   |
 | **Verificación** | Evaluación automática de fidelidad pre-entrega        |
@@ -38,6 +39,7 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 | Vector DB     | **Qdrant** (Docker)               | Escalable, filtrado por metadatos, HNSW eficiente             |
 | Índice léxico | **BM25 via rank_bm25**            | Ligero, sin servidor, complementa búsqueda semántica          |
 | Re-ranker     | **Cross-Encoder (ms-marco)**      | Mejora precisión post-fusión, modelos locales eficientes      |
+| Evaluación    | **RAGAS (LLM-as-judge)**          | Métricas estándar: faithfulness, relevancy, precision         |
 | Embeddings    | **OpenAI text-embedding-3-large** | Mejor relación calidad/precio ($0.13/1M tokens)               |
 | LLM Síntesis  | **Claude 3.5 Sonnet**             | 200k contexto, analítico, excelente en técnico                |
 | LLM Ruteo     | **GPT-4o-mini**                   | Ultra-económico para clasificación y planificación            |
