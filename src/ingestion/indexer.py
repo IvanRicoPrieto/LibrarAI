@@ -105,7 +105,8 @@ class LibraryIndexer:
         embedding_dimensions: int = 1536,
         qdrant_collection: str = "quantum_library",
         use_graph: bool = True,
-        qdrant_url: str = None
+        qdrant_url: str = None,
+        use_semantic_chunking: bool = False
     ):
         """
         Args:
@@ -116,6 +117,7 @@ class LibraryIndexer:
             qdrant_collection: Nombre de la colección en Qdrant
             use_graph: Si crear grafo de conocimiento
             qdrant_url: URL de Qdrant remoto (ej: http://localhost:6333). Si None, usa local.
+            use_semantic_chunking: Si usar chunking semántico adaptativo
         """
         self.indices_dir = Path(indices_dir)
         self.indices_dir.mkdir(parents=True, exist_ok=True)
@@ -126,6 +128,7 @@ class LibraryIndexer:
         self.qdrant_collection = qdrant_collection
         self.use_graph = use_graph
         self.qdrant_url = qdrant_url or os.getenv("QDRANT_URL")
+        self.use_semantic_chunking = use_semantic_chunking
         
         # Rutas de archivos
         self.manifest_path = self.indices_dir / "manifest.json"
@@ -142,7 +145,12 @@ class LibraryIndexer:
         
         # Parser y chunker
         self.parser = MarkdownParser()
-        self.chunker = HierarchicalChunker()
+        if use_semantic_chunking:
+            from .semantic_chunker import SemanticChunker
+            self.chunker = SemanticChunker()
+            logger.info("Usando chunking semántico adaptativo")
+        else:
+            self.chunker = HierarchicalChunker()
         
         # Cargar manifest existente
         self.manifest = self._load_manifest()

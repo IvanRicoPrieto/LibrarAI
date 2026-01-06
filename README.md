@@ -6,7 +6,10 @@ Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Fí
 
 - **🔍 Búsqueda híbrida**: Vector (semántica) + BM25 (léxica) + Grafo (relaciones)
 - **🎯 Re-ranking**: Cross-Encoder opcional que mejora precisión +15-25%
-- **� Evaluación RAGAS**: Pipeline de evaluación con métricas de calidad RAG- **💾 Cache de Embeddings**: Reduce costes 70-90% y elimina latencia en queries repetidas- **�📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
+- **📝 Evaluación RAGAS**: Pipeline de evaluación con métricas de calidad RAG
+- **💾 Cache de Embeddings**: Reduce costes 70-90% y elimina latencia en queries repetidas
+- **🧠 Chunking Semántico**: Detecta límites naturales (definiciones, teoremas, demostraciones)
+- **📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
 - **📝 Citas precisas**: Referencias `[n]` a fuentes específicas con ubicación
 - **🤖 Multi-LLM**: Claude Sonnet 4.5, GPT-4.1, modelos locales (Ollama)
 - **⚡ Indexación incremental**: Solo procesa documentos nuevos/modificados
@@ -339,7 +342,30 @@ python -m src.cli.ingest_library --build-graph
 
 # Dry run (ver qué se procesaría)
 python -m src.cli.ingest_library --dry-run
+
+# Chunking semántico (detecta definiciones, teoremas, demostraciones)
+python -m src.cli.ingest_library --semantic-chunking --force
 ```
+
+### Chunking Semántico Adaptativo
+
+El flag `--semantic-chunking` activa la detección automática de límites semánticos naturales:
+
+| Bloque Detectado        | Descripción                            | Preservación        |
+| ----------------------- | -------------------------------------- | ------------------- |
+| **Definición**          | `**Definición X:**`                    | Atómico             |
+| **Teorema/Lema**        | `**Teorema X:**`, `**Lema X:**`        | Atómico             |
+| **Demostración**        | `**Demostración:**` hasta `□`          | Divisible por pasos |
+| **Ejemplo**             | `**Ejemplo X:**`                       | Atómico             |
+| **Algoritmo/Protocolo** | `**Algoritmo X:**`, `**Protocolo X:**` | Atómico             |
+| **Código**              | Bloques ` ``` `                        | Atómico             |
+| **Ecuaciones**          | Bloques `$$...$$`                      | Atómico             |
+
+Beneficios:
+
+- Evita cortar definiciones o teoremas a la mitad
+- Mantiene contexto semántico completo
+- Mejora la relevancia de chunks recuperados
 
 ## 💰 Estimación de Costes
 

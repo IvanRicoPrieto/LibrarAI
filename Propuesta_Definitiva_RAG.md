@@ -29,7 +29,7 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 | **Evaluación**   | Pipeline RAGAS: faithfulness, relevancy, precision          |
 | **Cache**        | Embeddings cacheados: -70-90% costes, 0ms latencia          |
 | **Filtrado**     | Por categoría/metadata para reducir ruido de dominios       |
-| **Chunking**     | Jerárquico con auto-merge para contexto coherente           |
+| **Chunking**     | Jerárquico + semántico: detecta definiciones, teoremas, etc |
 | **Citas**        | Rutas de encabezado (ej: `Libro > Cap 3 > Sec 3.2`)         |
 | **Verificación** | Evaluación automática de fidelidad pre-entrega              |
 | **Privacidad**   | Datos 100% locales, solo APIs para LLM de generación        |
@@ -149,6 +149,29 @@ El sistema debe crear **3 niveles de fragmentos** vinculados entre sí:
 - Se indexan los chunks **Micro** (máxima densidad semántica)
 - Si la búsqueda recupera >50% de los hijos de un mismo padre → devolver el padre completo
 - Esto garantiza contexto coherente sin fragmentos inconexos
+
+### 3.2b Chunking Semántico Adaptativo (Opcional)
+
+El flag `--semantic-chunking` activa detección de límites semánticos naturales:
+
+| Bloque Detectado | Patrón                          | Preservación        |
+| ---------------- | ------------------------------- | ------------------- |
+| **Definición**   | `**Definición X:**`             | Atómico (no cortar) |
+| **Teorema/Lema** | `**Teorema X:**`, `**Lema X:**` | Atómico             |
+| **Corolario**    | `**Corolario X:**`              | Atómico             |
+| **Demostración** | `**Demostración:**` hasta `□`   | Divisible por pasos |
+| **Ejemplo**      | `**Ejemplo X:**`                | Atómico             |
+| **Algoritmo**    | `**Algoritmo X:**`              | Atómico             |
+| **Protocolo**    | `**Protocolo X:**`              | Atómico             |
+| **Código**       | Bloques ` ``` `                 | Atómico             |
+| **Ecuaciones**   | Bloques `$$...$$`               | Atómico             |
+
+**Beneficios:**
+
+- Evita cortar definiciones/teoremas a la mitad
+- Mantiene contexto semántico completo
+- Mejora relevancia de chunks recuperados
+- Soporta formato español e inglés
 
 ### 3.3 Metadatos por Chunk
 
@@ -800,6 +823,7 @@ quantum_library_rag/
 │   ├── ingestion/
 │   │   ├── parser.py          # Markdown parser con header_path
 │   │   ├── chunker.py         # Chunking jerárquico
+│   │   ├── semantic_chunker.py # Chunking semántico adaptativo
 │   │   └── indexer.py         # Creación de índices
 │   │
 │   ├── retrieval/

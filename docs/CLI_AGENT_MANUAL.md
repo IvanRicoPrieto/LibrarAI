@@ -290,13 +290,14 @@ python -m src.cli.ingest_library
 
 #### Parámetros
 
-| Parámetro   | Corto | Tipo   | Default | Descripción                      |
-| ----------- | ----- | ------ | ------- | -------------------------------- |
-| `--source`  | `-s`  | choice | all     | Fuente: `books`, `papers`, `all` |
-| `--force`   | `-f`  | flag   | false   | Forzar re-indexación             |
-| `--dry-run` | `-d`  | flag   | false   | Simular sin ejecutar             |
-| `--verbose` | `-v`  | flag   | false   | Logging detallado                |
-| `--costs`   | `-c`  | flag   | false   | Mostrar costes                   |
+| Parámetro             | Corto | Tipo   | Default | Descripción                                           |
+| --------------------- | ----- | ------ | ------- | ----------------------------------------------------- |
+| `--source`            | `-s`  | choice | all     | Fuente: `books`, `papers`, `all`                      |
+| `--force`             | `-f`  | flag   | false   | Forzar re-indexación                                  |
+| `--dry-run`           | `-d`  | flag   | false   | Simular sin ejecutar                                  |
+| `--verbose`           | `-v`  | flag   | false   | Logging detallado                                     |
+| `--costs`             | `-c`  | flag   | false   | Mostrar costes                                        |
+| `--semantic-chunking` | -     | flag   | false   | Chunking semántico: detecta definiciones, teoremas... |
 
 #### Ejemplos para Agentes
 
@@ -322,6 +323,12 @@ cd "/home/ivan/Computación Cuántica/LibrarAI" && python -m src.cli.ingest_libr
 
 ```bash
 cd "/home/ivan/Computación Cuántica/LibrarAI" && python -m src.cli.ingest_library --force
+```
+
+**Indexar con chunking semántico (recomendado para textos técnicos):**
+
+```bash
+cd "/home/ivan/Computación Cuántica/LibrarAI" && python -m src.cli.ingest_library --semantic-chunking --force
 ```
 
 **Ver costes de indexación:**

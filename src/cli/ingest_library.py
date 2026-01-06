@@ -139,6 +139,12 @@ Ejemplos:
         help='Simular sin hacer cambios'
     )
     
+    parser.add_argument(
+        '--semantic-chunking',
+        action='store_true',
+        help='Usar chunking semántico adaptativo (detecta definiciones, teoremas, etc.)'
+    )
+    
     args = parser.parse_args()
     
     # Configurar nivel de logging
@@ -205,8 +211,12 @@ Ejemplos:
         embedding_provider=embedding_config.get("provider", "openai"),
         embedding_model=embedding_config.get("model", "text-embedding-3-large"),
         embedding_dimensions=embedding_config.get("dimensions", 1536),
-        use_graph=config.get("graph", {}).get("enabled", True)
+        use_graph=config.get("graph", {}).get("enabled", True),
+        use_semantic_chunking=args.semantic_chunking
     )
+    
+    if args.semantic_chunking:
+        print("🧠 Chunking semántico activado (detecta definiciones, teoremas, etc.)")
     
     # Solo estadísticas
     if args.stats:
