@@ -5,6 +5,7 @@ Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Fí
 ## 📋 Características
 
 - **🔍 Búsqueda híbrida**: Vector (semántica) + BM25 (léxica) + Grafo (relaciones)
+- **🎯 Re-ranking**: Cross-Encoder opcional que mejora precisión +15-25%
 - **📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
 - **📝 Citas precisas**: Referencias `[n]` a fuentes específicas con ubicación
 - **🤖 Multi-LLM**: Claude Sonnet 4.5, GPT-4.1, modelos locales (Ollama)
@@ -84,6 +85,12 @@ python -m src.cli.ask_library "Compara BB84 con E91" --deep
 
 # Con validación de citas (Critic)
 python -m src.cli.ask_library "¿Qué es un qubit?" --critic
+
+# Re-ranking con Cross-Encoder (+15-25% precisión)
+python -m src.cli.ask_library "Teorema de No-Clonación" --rerank
+
+# Re-ranking con preset de máxima calidad
+python -m src.cli.ask_library "Ecuación de Schrödinger" --rerank --rerank-preset quality
 
 # Ejecutar código de la respuesta
 python -m src.cli.ask_library "Calcula entropía de von Neumann" --exec

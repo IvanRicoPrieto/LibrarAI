@@ -24,6 +24,7 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 | ---------------- | ----------------------------------------------------- |
 | **Integración**  | CLI directa en terminal/VS Code (sin MCP)             |
 | **Búsqueda**     | Híbrida: semántica (vectores) + léxica (BM25) + grafo |
+| **Re-ranking**   | Cross-Encoder opcional para +15-25% precisión         |
 | **Chunking**     | Jerárquico con auto-merge para contexto coherente     |
 | **Citas**        | Rutas de encabezado (ej: `Libro > Cap 3 > Sec 3.2`)   |
 | **Verificación** | Evaluación automática de fidelidad pre-entrega        |
@@ -36,6 +37,7 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 | Framework RAG | **LlamaIndex**                    | Soporte nativo para chunking jerárquico, citations, workflows |
 | Vector DB     | **Qdrant** (Docker)               | Escalable, filtrado por metadatos, HNSW eficiente             |
 | Índice léxico | **BM25 via rank_bm25**            | Ligero, sin servidor, complementa búsqueda semántica          |
+| Re-ranker     | **Cross-Encoder (ms-marco)**      | Mejora precisión post-fusión, modelos locales eficientes      |
 | Embeddings    | **OpenAI text-embedding-3-large** | Mejor relación calidad/precio ($0.13/1M tokens)               |
 | LLM Síntesis  | **Claude 3.5 Sonnet**             | 200k contexto, analítico, excelente en técnico                |
 | LLM Ruteo     | **GPT-4o-mini**                   | Ultra-económico para clasificación y planificación            |
@@ -78,10 +80,10 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
 │         └────────────────┼────────────────┘                      │
 │                          ▼                                       │
-│                 ┌─────────────┐                                  │
-│                 │ Fusion +    │                                  │
-│                 │ Auto-Merge  │                                  │
-│                 └─────────────┘                                  │
+│                 ┌─────────────┐      ┌─────────────┐            │
+│                 │ Fusion +    │ ───▶ │ Re-Ranker   │            │
+│                 │ Auto-Merge  │      │ (opcional)  │            │
+│                 └─────────────┘      └─────────────┘            │
 └─────────────────────────┬───────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -214,6 +216,7 @@ Para tu biblioteca de física/computación cuántica, definir ontología:
    b) BM25 search (top-30)
    c) Graph traversal (si detecta entidad conocida)
    d) Fusión RRF → top-10
+   e) (Opcional) Re-ranking con Cross-Encoder → top-k refinado
 
 4. EVALUAR suficiencia (Critic):
    - ¿Los fragmentos cubren la pregunta?

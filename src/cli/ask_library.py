@@ -264,13 +264,17 @@ class RAGPipeline:
         config: dict,
         model: str = "claude-sonnet-4-5-20250929",
         use_router: bool = True,
-        use_critic: bool = False
+        use_critic: bool = False,
+        use_reranker: bool = False,
+        reranker_preset: str = "balanced"
     ):
         self.indices_dir = indices_dir
         self.config = config
         self.model = model
         self.use_router = use_router
         self.use_critic = use_critic
+        self.use_reranker = use_reranker
+        self.reranker_preset = reranker_preset
         
         # Componentes (lazy init)
         self._retriever = None
@@ -292,13 +296,18 @@ class RAGPipeline:
         
         retrieval_config = self.config.get("retrieval", {})
         
+        # Determinar si usar reranker: CLI flag tiene prioridad sobre config
+        use_reranker = self.use_reranker or retrieval_config.get("reranker", {}).get("enabled", False)
+        reranker_preset = self.reranker_preset or retrieval_config.get("reranker", {}).get("preset", "balanced")
+        
         self._retriever = UnifiedRetriever(
             indices_dir=self.indices_dir,
             vector_weight=retrieval_config.get("vector_weight", 0.5),
             bm25_weight=retrieval_config.get("bm25_weight", 0.3),
             graph_weight=retrieval_config.get("graph_weight", 0.2),
             use_graph=self.config.get("graph", {}).get("enabled", True),
-            use_reranker=retrieval_config.get("reranker", {}).get("enabled", False)
+            use_reranker=use_reranker,
+            reranker_preset=reranker_preset
         )
         
         gen_config = self.config.get("generation", {})
@@ -799,6 +808,19 @@ Ejemplos:
     )
     
     parser.add_argument(
+        '--rerank',
+        action='store_true',
+        help='Aplicar re-ranking con cross-encoder para mejorar precisión (+15-25%%)'
+    )
+    
+    parser.add_argument(
+        '--rerank-preset',
+        choices=['fast', 'balanced', 'quality', 'max_quality'],
+        default='balanced',
+        help='Preset del reranker: fast (rápido), balanced (default), quality, max_quality'
+    )
+    
+    parser.add_argument(
         '--costs', '-c',
         action='store_true',
         help='Mostrar resumen de costes acumulados de consultas'
@@ -862,7 +884,9 @@ Ejemplos:
             config=config,
             model=model,
             use_router=not args.no_router,
-            use_critic=args.critic
+            use_critic=args.critic,
+            use_reranker=args.rerank,
+            reranker_preset=args.rerank_preset
         )
     except Exception as e:
         logger.error(f"Error inicializando pipeline: {e}")
