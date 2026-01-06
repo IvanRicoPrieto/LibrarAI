@@ -191,6 +191,26 @@ El router analiza cada query y ajusta automáticamente los pesos de fusión RRF:
 | **Comparativa** | "Compara BB84 con E91"        | 0.4    | 0.3  | 0.3   |
 | **Multi-hop**   | "X y además Y"                | 0.4    | 0.3  | 0.3   |
 
+#### Ontología del Grafo de Conocimiento
+
+El grafo utiliza una ontología ampliada con 18 tipos de entidad y 19 tipos de relación:
+
+**Tipos de Entidad:**
+
+- Computación Cuántica: `Algoritmo`, `Protocolo`, `Gate`, `Hardware`
+- Física: `Concepto`, `Teorema`, `Autor`, `Documento`
+- Matemáticas: `EstructuraAlgebraica`, `GrupoEspecifico`, `EspacioVectorial`, `Operador`
+- Topología: `EspacioTopologico`, `InvarianteTopologico`
+- Análisis: `ConceptoAnalisis`, `TeoremaMath`
+- Información: `MedidaInformacion`, `Canal`
+
+**Relaciones principales:**
+
+- `DEPENDE_DE`, `USA`, `MEJORA` (algoritmos/protocolos)
+- `ACTUA_SOBRE`, `SUBESPACIO_DE`, `SUBGRUPO_DE` (estructuras matemáticas)
+- `GENERA`, `PRESERVA`, `SE_DESCOMPONE_EN` (álgebra)
+- `CARACTERIZA`, `SATISFACE`, `REPRESENTA` (propiedades)
+
 ---
 
 ### 2. Indexar Biblioteca (`ingest_library`)

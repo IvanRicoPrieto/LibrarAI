@@ -1,13 +1,15 @@
 # =============================================================================
-# ONTOLOGÍA PARA GRAFO DE CONOCIMIENTO - Computación Cuántica
+# ONTOLOGÍA PARA GRAFO DE CONOCIMIENTO - Computación Cuántica y Matemáticas
 # =============================================================================
 # Define las entidades y relaciones para el dominio de física cuántica,
-# información cuántica y computación cuántica.
+# información cuántica, computación cuántica y sus fundamentos matemáticos.
 
 # -----------------------------------------------------------------------------
 # Entidades (Nodos del Grafo)
 # -----------------------------------------------------------------------------
 entities:
+  # ===== COMPUTACIÓN CUÁNTICA =====
+
   # Algoritmos cuánticos
   Algoritmo:
     description: "Algoritmo cuántico o protocolo computacional"
@@ -131,10 +133,187 @@ entities:
       - "tecnología {name}"
       - "plataforma {name}"
 
+  # ===== ESTRUCTURAS ALGEBRAICAS =====
+
+  EstructuraAlgebraica:
+    description: "Estructura algebraica abstracta"
+    examples:
+      - "Grupo"
+      - "Anillo"
+      - "Cuerpo"
+      - "Álgebra"
+      - "Módulo"
+      - "Semigrupo"
+      - "Monoide"
+      - "Álgebra de Lie"
+      - "Álgebra de Clifford"
+    extraction_patterns:
+      - "el grupo {name}"
+      - "{name} es un grupo"
+      - "el álgebra de {name}"
+      - "anillo de {name}"
+
+  GrupoEspecifico:
+    description: "Grupo matemático específico"
+    examples:
+      - "SU(2)"
+      - "SU(n)"
+      - "U(n)"
+      - "SO(3)"
+      - "Grupo de Pauli"
+      - "Grupo de Clifford"
+      - "Grupo simétrico"
+      - "Grupo de Galois"
+      - "Grupo de Lorentz"
+      - "Grupo de Poincaré"
+    extraction_patterns:
+      - "el grupo {name}"
+      - "grupo {name}"
+      - "{name} group"
+
+  # ===== ESPACIOS VECTORIALES Y FUNCIONALES =====
+
+  EspacioVectorial:
+    description: "Espacio vectorial o espacio funcional"
+    examples:
+      - "Espacio de Hilbert"
+      - "Espacio de Fock"
+      - "Espacio de Banach"
+      - "Espacio de Sobolev"
+      - "Espacio de Lebesgue"
+      - "Espacio dual"
+      - "Espacio tangente"
+      - "Espacio cotangente"
+    extraction_patterns:
+      - "espacio de {name}"
+      - "{name} space"
+      - "el espacio {name}"
+
+  Operador:
+    description: "Operador lineal o funcional"
+    examples:
+      - "Operador unitario"
+      - "Operador hermítico"
+      - "Operador densidad"
+      - "Operador de creación"
+      - "Operador de aniquilación"
+      - "Hamiltoniano"
+      - "Observable"
+      - "Proyector"
+      - "Operador de evolución"
+    extraction_patterns:
+      - "operador {name}"
+      - "el operador de {name}"
+      - "{name} operator"
+
+  # ===== TOPOLOGÍA =====
+
+  EspacioTopologico:
+    description: "Espacio o estructura topológica"
+    examples:
+      - "Variedad"
+      - "Variedad diferenciable"
+      - "Fibrado"
+      - "Espacio compacto"
+      - "Espacio conexo"
+      - "Toro"
+      - "Esfera"
+      - "Espacio proyectivo"
+    extraction_patterns:
+      - "variedad {name}"
+      - "espacio {name}"
+      - "la topología de {name}"
+
+  InvarianteTopologico:
+    description: "Invariante o propiedad topológica"
+    examples:
+      - "Número de Chern"
+      - "Fase de Berry"
+      - "Invariante Z2"
+      - "Característica de Euler"
+      - "Grupo de homotopía"
+      - "Grupo de homología"
+      - "Número de enrollamiento"
+    extraction_patterns:
+      - "invariante {name}"
+      - "número de {name}"
+      - "fase de {name}"
+
+  # ===== ANÁLISIS FUNCIONAL =====
+
+  ConceptoAnalisis:
+    description: "Concepto de análisis funcional o matemático"
+    examples:
+      - "Producto interno"
+      - "Norma"
+      - "Convergencia"
+      - "Continuidad"
+      - "Completitud"
+      - "Autovalue"
+      - "Autovector"
+      - "Espectro"
+      - "Descomposición espectral"
+      - "Traza"
+      - "Determinante"
+    extraction_patterns:
+      - "el/la {name}"
+      - "{name} de un operador"
+      - "la propiedad de {name}"
+
+  TeoremaMath:
+    description: "Teorema matemático fundamental"
+    examples:
+      - "Teorema espectral"
+      - "Teorema de Stone"
+      - "Teorema de representación"
+      - "Teorema de Riesz"
+      - "Teorema de Hahn-Banach"
+      - "Lema de Schur"
+      - "Teorema de descomposición polar"
+      - "Teorema de Cayley-Hamilton"
+    extraction_patterns:
+      - "teorema de {name}"
+      - "{name} theorem"
+      - "el teorema {name}"
+
+  # ===== TEORÍA DE LA INFORMACIÓN =====
+
+  MedidaInformacion:
+    description: "Medida o cantidad de teoría de la información"
+    examples:
+      - "Entropía de Shannon"
+      - "Entropía de von Neumann"
+      - "Información mutua"
+      - "Fidelidad"
+      - "Distancia de traza"
+      - "Entropía relativa"
+      - "Capacidad de canal"
+      - "Coherent information"
+    extraction_patterns:
+      - "entropía de {name}"
+      - "información de {name}"
+      - "la {name}"
+
+  Canal:
+    description: "Canal cuántico o clásico"
+    examples:
+      - "Canal de desfase"
+      - "Canal de despolarización"
+      - "Canal de amplificación"
+      - "Canal de bit-flip"
+      - "Canal de Pauli"
+      - "Canal de Kraus"
+    extraction_patterns:
+      - "canal de {name}"
+      - "{name} channel"
+      - "el canal {name}"
+
 # -----------------------------------------------------------------------------
 # Relaciones (Aristas del Grafo)
 # -----------------------------------------------------------------------------
 relations:
+  # ===== RELACIONES DE COMPUTACIÓN CUÁNTICA =====
+
   MEJORA:
     description: "Un algoritmo/protocolo mejora a otro"
     source_types: ["Algoritmo", "Protocolo"]
@@ -145,16 +324,27 @@ relations:
 
   DEPENDE_DE:
     description: "Un concepto/algoritmo depende de otro"
-    source_types: ["Algoritmo", "Protocolo", "Concepto", "Teorema"]
-    target_types: ["Concepto", "Teorema", "Gate"]
+    source_types:
+      ["Algoritmo", "Protocolo", "Concepto", "Teorema", "TeoremaMath"]
+    target_types:
+      [
+        "Concepto",
+        "Teorema",
+        "Gate",
+        "EstructuraAlgebraica",
+        "EspacioVectorial",
+        "ConceptoAnalisis",
+        "TeoremaMath",
+      ]
     examples:
       - "BB84 depende del teorema de no-clonación"
       - "VQE depende de estados variacionales"
+      - "Operador densidad depende de espacio de Hilbert"
 
   USA:
     description: "Un algoritmo/protocolo usa una gate o concepto"
     source_types: ["Algoritmo", "Protocolo"]
-    target_types: ["Gate", "Concepto"]
+    target_types: ["Gate", "Concepto", "Operador", "EspacioVectorial"]
     examples:
       - "Grover usa Hadamard"
       - "Shor usa QFT"
@@ -162,7 +352,15 @@ relations:
   DEFINE:
     description: "Un documento define un concepto/teorema"
     source_types: ["Documento"]
-    target_types: ["Concepto", "Teorema", "Algoritmo", "Protocolo"]
+    target_types:
+      [
+        "Concepto",
+        "Teorema",
+        "Algoritmo",
+        "Protocolo",
+        "TeoremaMath",
+        "EstructuraAlgebraica",
+      ]
     examples:
       - "Nielsen & Chuang define el teorema de no-clonación"
 
@@ -183,7 +381,7 @@ relations:
   DEMUESTRA:
     description: "Un autor demuestra un teorema"
     source_types: ["Autor"]
-    target_types: ["Teorema"]
+    target_types: ["Teorema", "TeoremaMath"]
     examples:
       - "Wootters y Zurek demostraron no-clonación"
 
@@ -197,18 +395,103 @@ relations:
 
   ES_CASO_DE:
     description: "Un concepto es caso particular de otro más general"
-    source_types: ["Concepto", "Algoritmo", "Protocolo"]
-    target_types: ["Concepto"]
+    source_types:
+      [
+        "Concepto",
+        "Algoritmo",
+        "Protocolo",
+        "EstructuraAlgebraica",
+        "EspacioVectorial",
+      ]
+    target_types: ["Concepto", "EstructuraAlgebraica", "EspacioVectorial"]
     examples:
       - "BB84 es caso de QKD"
       - "Estado de Bell es caso de estado entrelazado"
+      - "SU(2) es caso de grupo de Lie"
+      - "Espacio de Hilbert es caso de espacio de Banach"
 
   EQUIVALE_A:
     description: "Dos conceptos son equivalentes"
-    source_types: ["Concepto", "Gate"]
-    target_types: ["Concepto", "Gate"]
+    source_types: ["Concepto", "Gate", "Operador"]
+    target_types: ["Concepto", "Gate", "Operador"]
     examples:
       - "NOT cuántico equivale a Pauli-X"
+
+  # ===== RELACIONES MATEMÁTICAS =====
+
+  ACTUA_SOBRE:
+    description: "Un operador o grupo actúa sobre un espacio"
+    source_types: ["Operador", "GrupoEspecifico", "EstructuraAlgebraica"]
+    target_types: ["EspacioVectorial", "EspacioTopologico"]
+    examples:
+      - "SU(2) actúa sobre la esfera de Bloch"
+      - "Hamiltoniano actúa sobre espacio de Hilbert"
+      - "Grupo de Pauli actúa sobre qubits"
+
+  SUBESPACIO_DE:
+    description: "Un espacio es subespacio de otro"
+    source_types: ["EspacioVectorial", "EspacioTopologico"]
+    target_types: ["EspacioVectorial", "EspacioTopologico"]
+    examples:
+      - "Espacio de estados puros es subespacio de Hilbert"
+
+  SUBGRUPO_DE:
+    description: "Un grupo es subgrupo de otro"
+    source_types: ["GrupoEspecifico", "EstructuraAlgebraica"]
+    target_types: ["GrupoEspecifico", "EstructuraAlgebraica"]
+    examples:
+      - "Grupo de Pauli es subgrupo del grupo de Clifford"
+      - "SO(3) es subgrupo de SU(2)"
+
+  GENERA:
+    description: "Un conjunto genera una estructura algebraica"
+    source_types: ["Gate", "Operador", "Concepto"]
+    target_types: ["GrupoEspecifico", "EstructuraAlgebraica"]
+    examples:
+      - "Hadamard y CNOT generan el grupo de Clifford"
+      - "Pauli-X, Y, Z generan el grupo de Pauli"
+
+  PRESERVA:
+    description: "Una transformación preserva una propiedad"
+    source_types: ["Operador", "Gate", "Canal"]
+    target_types:
+      ["ConceptoAnalisis", "MedidaInformacion", "InvarianteTopologico"]
+    examples:
+      - "Operador unitario preserva la norma"
+      - "Canal cuántico preserva positividad"
+
+  SE_DESCOMPONE_EN:
+    description: "Un operador/espacio se descompone en partes"
+    source_types: ["Operador", "EspacioVectorial", "EstructuraAlgebraica"]
+    target_types: ["Operador", "EspacioVectorial", "EstructuraAlgebraica"]
+    examples:
+      - "Operador hermítico se descompone en autovectores"
+      - "Espacio de Hilbert se descompone en subespacios ortogonales"
+
+  CARACTERIZA:
+    description: "Una propiedad caracteriza una estructura"
+    source_types:
+      ["InvarianteTopologico", "ConceptoAnalisis", "MedidaInformacion"]
+    target_types: ["EspacioTopologico", "EspacioVectorial", "Canal"]
+    examples:
+      - "Número de Chern caracteriza aislantes topológicos"
+      - "Entropía caracteriza estados mixtos"
+
+  SATISFACE:
+    description: "Una estructura satisface un teorema o propiedad"
+    source_types: ["Operador", "EspacioVectorial", "EstructuraAlgebraica"]
+    target_types: ["TeoremaMath", "Teorema", "ConceptoAnalisis"]
+    examples:
+      - "Operador hermítico satisface teorema espectral"
+      - "Espacio de Hilbert satisface completitud"
+
+  REPRESENTA:
+    description: "Una estructura representa otra"
+    source_types: ["GrupoEspecifico", "Operador"]
+    target_types: ["Concepto", "Gate", "EstructuraAlgebraica"]
+    examples:
+      - "SU(2) representa rotaciones de spin"
+      - "Matrices de Pauli representan el álgebra su(2)"
 
 # -----------------------------------------------------------------------------
 # Reglas de Extracción
@@ -221,6 +504,9 @@ extraction_rules:
     - "es el/la"
     - "consiste en"
     - "se conoce como"
+    - "sea {name} un/una"
+    - "consideremos {name}"
+    - "denotamos por {name}"
 
   # Patrones para detectar relaciones
   relation_patterns:
@@ -237,6 +523,58 @@ extraction_rules:
       - "{A} usa {B}"
       - "{A} emplea {B}"
       - "{A} aplica {B}"
+    actua_sobre:
+      - "{A} actúa sobre {B}"
+      - "{A} opera en {B}"
+      - "acción de {A} sobre {B}"
+    subespacio:
+      - "{A} es subespacio de {B}"
+      - "{A} ⊂ {B}"
+      - "{A} está contenido en {B}"
+    subgrupo:
+      - "{A} es subgrupo de {B}"
+      - "{A} < {B}"
+      - "{A} está contenido en {B}"
+    genera:
+      - "{A} genera {B}"
+      - "{A} engendra {B}"
+      - "{B} es generado por {A}"
+    preserva:
+      - "{A} preserva {B}"
+      - "{A} mantiene {B}"
+      - "{A} conserva {B}"
+    descompone:
+      - "{A} se descompone en {B}"
+      - "descomposición de {A} en {B}"
+      - "{A} = {B}"
+    satisface:
+      - "{A} satisface {B}"
+      - "{A} cumple {B}"
+      - "por {B}, {A}"
+    representa:
+      - "{A} representa {B}"
+      - "{A} es representación de {B}"
+
+  # Patrones específicos para matemáticas
+  math_patterns:
+    grupo:
+      - "grupo {name}"
+      - "el grupo {name}"
+      - "{name} group"
+    espacio:
+      - "espacio de {name}"
+      - "espacio {name}"
+      - "{name} space"
+    operador:
+      - "operador {name}"
+      - "operador de {name}"
+      - "{name} operator"
+    teorema:
+      - "teorema de {name}"
+      - "teorema {name}"
+      - "{name} theorem"
+      - "lema de {name}"
+      - "corolario de {name}"
 
   # Umbral de confianza mínimo para extraer
   min_confidence: 0.7

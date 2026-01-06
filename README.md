@@ -196,7 +196,7 @@ open http://localhost:6333/dashboard
 LibrarAI/
 ├── config/
 │   ├── settings.yaml      # Configuración principal
-│   └── ontology.yaml      # Ontología del dominio
+│   └── ontology.yaml      # Ontología del dominio (18 tipos, 19 relaciones)
 ├── data/
 │   ├── books/             # Libros organizados por temática
 │   │   ├── computacion_cuantica/

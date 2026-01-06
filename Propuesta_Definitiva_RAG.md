@@ -188,24 +188,58 @@ La `header_path` es la **cita semántica** que reemplaza números de página.
 
 ### 4.2 Grafo de Conocimiento
 
-Para tu biblioteca de física/computación cuántica, definir ontología:
+Para tu biblioteca de física/computación cuántica, se define una ontología ampliada:
 
-**Entidades:**
+**Entidades (18 tipos):**
+
+Computación Cuántica:
 
 - `Algoritmo` (Shor, Grover, VQE...)
 - `Protocolo` (BB84, E91, QKD...)
+- `Gate` (Hadamard, CNOT, Pauli...)
+- `Hardware` (Superconductores, Iones atrapados...)
+
+Física y Conceptos:
+
 - `Concepto` (Entrelazamiento, Decoherencia...)
+- `Teorema` (No-Clonación, Bell...)
 - `Autor` (Nielsen, Chuang, Preskill...)
-- `Paper/Libro`
+- `Documento` (Papers, Libros)
 
-**Relaciones:**
+Estructuras Matemáticas:
 
-- `MEJORA` (Algoritmo A mejora B)
-- `DEPENDE_DE` (Protocolo usa Concepto)
-- `CITA` (Paper X cita Paper Y)
-- `DEFINE` (Libro define Concepto)
+- `EstructuraAlgebraica` (Grupo, Anillo, Álgebra de Lie...)
+- `GrupoEspecifico` (SU(2), SO(3), Grupo de Pauli...)
+- `EspacioVectorial` (Hilbert, Fock, Banach...)
+- `Operador` (Unitario, Hermítico, Densidad...)
 
-**Uso:** Cuando la búsqueda vectorial encuentra un concepto, el grafo permite "saltar" a documentos relacionados aunque no compartan palabras clave.
+Topología y Análisis:
+
+- `EspacioTopologico` (Variedad, Fibrado...)
+- `InvarianteTopologico` (Número de Chern, Fase de Berry...)
+- `ConceptoAnalisis` (Espectro, Traza, Norma...)
+- `TeoremaMath` (Teorema espectral, Stone, Riesz...)
+
+Teoría de la Información:
+
+- `MedidaInformacion` (Entropía de Shannon, von Neumann...)
+- `Canal` (Desfase, Despolarización...)
+
+**Relaciones (19 tipos):**
+
+Computación:
+
+- `MEJORA`, `DEPENDE_DE`, `USA`, `IMPLEMENTA`
+- `CITA`, `DEFINE`, `DEMUESTRA`, `PROPONE`
+- `ES_CASO_DE`, `EQUIVALE_A`
+
+Matemáticas:
+
+- `ACTUA_SOBRE`, `SUBESPACIO_DE`, `SUBGRUPO_DE`
+- `GENERA`, `PRESERVA`, `SE_DESCOMPONE_EN`
+- `CARACTERIZA`, `SATISFACE`, `REPRESENTA`
+
+**Uso:** El grafo permite "saltar" entre documentos relacionados aunque no compartan palabras clave. Especialmente útil para queries relacionales como "¿Cómo se relaciona SU(2) con la esfera de Bloch?"
 
 ### 4.3 Flujo de Recuperación Agéntica (Deep Research)
 
@@ -666,7 +700,7 @@ quantum_library_rag/
 │
 ├── config/
 │   ├── settings.yaml          # Configuración general
-│   └── ontology.yaml          # Definición de entidades/relaciones
+│   └── ontology.yaml          # Ontología ampliada (18 entidades, 19 relaciones)
 │
 ├── data/
 │   ├── markdown/              # Biblioteca de documentos .md
