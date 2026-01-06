@@ -336,7 +336,8 @@ class RAGPipeline:
         stream: bool = False,
         stream_callback=None,
         sources_only: bool = False,
-        abstention_threshold: float = 0.002
+        abstention_threshold: float = 0.002,
+        filters: dict = None
     ):
         """
         Procesa una consulta.
@@ -349,6 +350,7 @@ class RAGPipeline:
             sources_only: Solo devolver fuentes sin generar respuesta
             abstention_threshold: Umbral mínimo de score RRF para responder (default: 0.002)
                                  Nota: scores RRF típicos están en rango 0.001-0.02
+            filters: Filtros de metadatos (ej: {"category": "computacion_cuantica"})
         
         Returns:
             Tuple (response, sources, routing_decision)
@@ -366,6 +368,9 @@ class RAGPipeline:
         if routing:
             search_kwargs["vector_top_k"] = int(top_k * (1 + routing.vector_weight))
             search_kwargs["bm25_top_k"] = int(top_k * (1 + routing.bm25_weight))
+        
+        if filters:
+            search_kwargs["filters"] = filters
         
         sources = self._retriever.search(query, **search_kwargs)
         
@@ -830,6 +835,21 @@ Ejemplos:
     )
     
     parser.add_argument(
+        '--filter', '-f',
+        type=str,
+        action='append',
+        dest='filters',
+        metavar='KEY:VALUE',
+        help='Filtrar por metadatos (ej: --filter category:computacion_cuantica). Puede usarse múltiples veces'
+    )
+    
+    parser.add_argument(
+        '--list-categories',
+        action='store_true',
+        help='Listar categorías disponibles y salir'
+    )
+    
+    parser.add_argument(
         '--cache-stats',
         action='store_true',
         help='Mostrar estadísticas del cache de embeddings'
@@ -871,6 +891,39 @@ Ejemplos:
             cache.close()
         except Exception as e:
             print(f"❌ Error mostrando estadísticas de cache: {e}")
+        sys.exit(0)
+    
+    # Si pide listar categorías, mostrar y salir
+    if args.list_categories:
+        try:
+            paths = setup_paths()
+            from qdrant_client import QdrantClient
+            client = QdrantClient(path=str(paths["indices_dir"] / "qdrant"))
+            
+            # Obtener categorías únicas haciendo scroll
+            categories = set()
+            offset = None
+            while True:
+                results, offset = client.scroll(
+                    collection_name="quantum_library",
+                    limit=1000,
+                    offset=offset,
+                    with_payload=["category"]
+                )
+                for point in results:
+                    if point.payload and "category" in point.payload:
+                        categories.add(point.payload["category"])
+                if offset is None:
+                    break
+            
+            print("\n📁 Categorías Disponibles")
+            print("=" * 35)
+            for cat in sorted(categories):
+                print(f"  • {cat}")
+            print(f"\nTotal: {len(categories)} categorías")
+            print("\nUso: --filter category:CATEGORIA")
+        except Exception as e:
+            print(f"❌ Error listando categorías: {e}")
         sys.exit(0)
     
     # Verificar que hay query o modo interactivo
@@ -954,6 +1007,17 @@ Ejemplos:
             print("\n📝 Respuesta:")
             print("─" * 60)
         
+        # Parsear filtros de args
+        filters = None
+        if args.filters:
+            filters = {}
+            for f in args.filters:
+                if ':' in f:
+                    key, value = f.split(':', 1)
+                    filters[key.strip()] = value.strip()
+                else:
+                    logger.warning(f"Filtro ignorado (formato inválido): {f}")
+        
         # Llamar al pipeline con modo deep research si aplica
         if args.deep:
             response, sources, routing = pipeline.ask_deep(
@@ -967,7 +1031,8 @@ Ejemplos:
                 top_k=args.top_k,
                 stream=args.stream,
                 stream_callback=stream_callback,
-                sources_only=args.sources
+                sources_only=args.sources,
+                filters=filters
             )
         
         if args.json:

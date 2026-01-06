@@ -134,6 +134,19 @@ python -m src.cli.ask_library --cache-stats
 python -m src.cli.ask_library "Pregunta" --no-cache
 ```
 
+### Filtrado por Categoría
+
+```bash
+# Listar categorías disponibles
+python -m src.cli.ask_library --list-categories
+
+# Filtrar por categoría
+python -m src.cli.ask_library "¿Qué es un qubit?" --filter category:computacion_cuantica
+
+# Múltiples filtros
+python -m src.cli.ask_library "BB84" --filter category:comunicacion_cuantica --filter doc_title:Nielsen
+```
+
 ## 🏗️ Arquitectura
 
 ```

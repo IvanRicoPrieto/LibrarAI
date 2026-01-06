@@ -48,27 +48,29 @@ source .venv/bin/activate && python -m src.cli.ask_library "PREGUNTA"
 
 #### Parámetros Completos
 
-| Parámetro         | Corto | Tipo   | Default  | Descripción                                              |
-| ----------------- | ----- | ------ | -------- | -------------------------------------------------------- |
-| `query`           | -     | string | -        | Pregunta a realizar (posicional)                         |
-| `--interactive`   | `-i`  | flag   | false    | Modo interactivo                                         |
-| `--model`         | `-m`  | choice | claude   | Modelo: `claude`, `gpt-4.1`, `gpt-4.1-mini`, `local`     |
-| `--top-k`         | `-k`  | int    | 10       | Documentos a recuperar                                   |
-| `--no-sources`    | -     | flag   | false    | Ocultar fuentes                                          |
-| `--sources`       | -     | flag   | false    | Solo mostrar fuentes (sin generar respuesta)             |
-| `--deep`          | -     | flag   | false    | Deep Research: descompone queries y busca iterativamente |
-| `--stream`        | -     | flag   | false    | Streaming de respuesta                                   |
-| `--save`          | `-s`  | flag   | false    | Guardar sesión                                           |
-| `--json`          | -     | flag   | false    | Salida JSON                                              |
-| `--verbose`       | `-v`  | flag   | false    | Logging detallado                                        |
-| `--no-router`     | -     | flag   | false    | Desactivar router                                        |
-| `--critic`        | -     | flag   | false    | Activar crítico con validación de citas                  |
-| `--exec`          | -     | flag   | false    | Permitir ejecución de código (sandbox seguro)            |
-| `--rerank`        | -     | flag   | false    | Aplicar re-ranking con cross-encoder (+15-25% precisión) |
-| `--rerank-preset` | -     | choice | balanced | Preset: fast, balanced, quality, max_quality             |
-| `--no-cache`      | -     | flag   | false    | Deshabilitar cache de embeddings                         |
-| `--cache-stats`   | -     | flag   | false    | Mostrar estadísticas del cache                           |
-| `--costs`         | `-c`  | flag   | false    | Mostrar costes                                           |
+| Parámetro           | Corto | Tipo   | Default  | Descripción                                              |
+| ------------------- | ----- | ------ | -------- | -------------------------------------------------------- |
+| `query`             | -     | string | -        | Pregunta a realizar (posicional)                         |
+| `--interactive`     | `-i`  | flag   | false    | Modo interactivo                                         |
+| `--model`           | `-m`  | choice | claude   | Modelo: `claude`, `gpt-4.1`, `gpt-4.1-mini`, `local`     |
+| `--top-k`           | `-k`  | int    | 10       | Documentos a recuperar                                   |
+| `--no-sources`      | -     | flag   | false    | Ocultar fuentes                                          |
+| `--sources`         | -     | flag   | false    | Solo mostrar fuentes (sin generar respuesta)             |
+| `--deep`            | -     | flag   | false    | Deep Research: descompone queries y busca iterativamente |
+| `--stream`          | -     | flag   | false    | Streaming de respuesta                                   |
+| `--save`            | `-s`  | flag   | false    | Guardar sesión                                           |
+| `--json`            | -     | flag   | false    | Salida JSON                                              |
+| `--verbose`         | `-v`  | flag   | false    | Logging detallado                                        |
+| `--no-router`       | -     | flag   | false    | Desactivar router                                        |
+| `--critic`          | -     | flag   | false    | Activar crítico con validación de citas                  |
+| `--exec`            | -     | flag   | false    | Permitir ejecución de código (sandbox seguro)            |
+| `--rerank`          | -     | flag   | false    | Aplicar re-ranking con cross-encoder (+15-25% precisión) |
+| `--rerank-preset`   | -     | choice | balanced | Preset: fast, balanced, quality, max_quality             |
+| `--no-cache`        | -     | flag   | false    | Deshabilitar cache de embeddings                         |
+| `--cache-stats`     | -     | flag   | false    | Mostrar estadísticas del cache                           |
+| `--filter`          | `-f`  | string | -        | Filtrar por metadata (KEY:VALUE), repetible              |
+| `--list-categories` | -     | flag   | false    | Listar categorías disponibles                            |
+| `--costs`           | `-c`  | flag   | false    | Mostrar costes                                           |
 
 #### Ejemplos de Uso para Agentes
 

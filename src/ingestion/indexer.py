@@ -445,7 +445,12 @@ class LibraryIndexer:
         # Generar embeddings e indexar en Qdrant
         if all_new_chunks:
             logger.info(f"Indexando {len(all_new_chunks)} chunks en Qdrant...")
-            self._index_chunks_to_qdrant(all_new_chunks)
+            # Construir mapeo doc_id -> file_path para categorías
+            file_paths = {
+                m.doc_id: m.file_path 
+                for m in self.manifest.documents.values()
+            }
+            self._index_chunks_to_qdrant(all_new_chunks, file_paths)
         
         # Construir/actualizar BM25
         all_micro_chunks = [
@@ -473,8 +478,14 @@ class LibraryIndexer:
         
         return stats
     
-    def _index_chunks_to_qdrant(self, chunks: List[Chunk]):
-        """Indexa chunks en Qdrant."""
+    def _index_chunks_to_qdrant(self, chunks: List[Chunk], file_paths: Dict[str, str] = None):
+        """
+        Indexa chunks en Qdrant.
+        
+        Args:
+            chunks: Lista de chunks a indexar
+            file_paths: Diccionario doc_id -> file_path para extraer categoría
+        """
         from qdrant_client.models import PointStruct
         
         # Generar embeddings
@@ -484,6 +495,15 @@ class LibraryIndexer:
         # Crear puntos para Qdrant
         points = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            # Extraer categoría del file_path (primera carpeta)
+            category = "general"
+            if file_paths and chunk.doc_id in file_paths:
+                path = file_paths[chunk.doc_id]
+                parts = path.split("/")
+                if len(parts) > 1:
+                    # Usar primera subcarpeta como categoría
+                    category = parts[0]
+            
             point = PointStruct(
                 id=hash(chunk.chunk_id) % (2**63),  # ID numérico
                 vector=embedding,
@@ -495,7 +515,8 @@ class LibraryIndexer:
                     "header_path": chunk.header_path,
                     "parent_id": chunk.parent_id,
                     "level": chunk.level.value,
-                    "token_count": chunk.token_count
+                    "token_count": chunk.token_count,
+                    "category": category
                 }
             )
             points.append(point)

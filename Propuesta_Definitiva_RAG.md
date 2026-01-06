@@ -27,6 +27,7 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 | **Re-ranking**   | Cross-Encoder opcional para +15-25% precisión         |
 | **Evaluación**   | Pipeline RAGAS: faithfulness, relevancy, precision    |
 | **Cache**        | Embeddings cacheados: -70-90% costes, 0ms latencia    |
+| **Filtrado**     | Por categoría/metadata para reducir ruido de dominios |
 | **Chunking**     | Jerárquico con auto-merge para contexto coherente     |
 | **Citas**        | Rutas de encabezado (ej: `Libro > Cap 3 > Sec 3.2`)   |
 | **Verificación** | Evaluación automática de fidelidad pre-entrega        |
