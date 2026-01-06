@@ -273,6 +273,11 @@ retrieval:
   bm25_top_k: 30
   rrf_k: 60
   final_top_k: 10
+  # Pesos dinámicos ajustados automáticamente según tipo de query:
+  # - Query exacta (BB84, Shor): bm25=0.6, vector=0.3, graph=0.1
+  # - Query conceptual: vector=0.5, bm25=0.3, graph=0.2
+  # - Query relacional: graph=0.5, vector=0.3, bm25=0.2
+  # - Query comparativa: vector=0.4, bm25=0.3, graph=0.3
 
 generation:
   provider: anthropic

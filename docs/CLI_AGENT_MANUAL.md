@@ -172,10 +172,24 @@ cd "/home/ivan/Computación Cuántica/LibrarAI" && source .venv/bin/activate && 
   "routing": {
     "strategy": "hybrid",
     "vector_weight": 0.6,
-    "bm25_weight": 0.4
+    "bm25_weight": 0.4,
+    "graph_weight": 0.0,
+    "reasoning": "Query general: estrategia híbrida balanceada"
   }
 }
 ```
+
+#### Routing con Pesos Dinámicos
+
+El router analiza cada query y ajusta automáticamente los pesos de fusión RRF:
+
+| Tipo de Query   | Ejemplo                       | vector | bm25 | graph |
+| --------------- | ----------------------------- | ------ | ---- | ----- |
+| **Exacta**      | "¿Qué es BB84?"               | 0.3    | 0.6  | 0.1   |
+| **Conceptual**  | "Explica el entrelazamiento"  | 0.5    | 0.3  | 0.2   |
+| **Relacional**  | "¿Cómo se relaciona X con Y?" | 0.3    | 0.2  | 0.5   |
+| **Comparativa** | "Compara BB84 con E91"        | 0.4    | 0.3  | 0.3   |
+| **Multi-hop**   | "X y además Y"                | 0.4    | 0.3  | 0.3   |
 
 ---
 

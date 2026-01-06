@@ -120,7 +120,8 @@ class HybridFusion:
         bm25_results: Optional[List[BM25SearchResult]] = None,
         graph_results: Optional[List[GraphSearchResult]] = None,
         top_k: int = 10,
-        query: str = None  # Necesario si hay reranker
+        query: str = None,  # Necesario si hay reranker
+        dynamic_weights: Optional[Dict[str, float]] = None  # Pesos dinámicos desde router
     ) -> List[RetrievalResult]:
         """
         Fusiona resultados de múltiples retrievers.
@@ -131,10 +132,25 @@ class HybridFusion:
             graph_results: Resultados de búsqueda en grafo
             top_k: Número de resultados finales
             query: Query original (necesario para re-ranking)
+            dynamic_weights: Pesos dinámicos {"vector": 0.5, "bm25": 0.3, "graph": 0.2}
+                            Si se proporcionan, sobreescriben los pesos por defecto
             
         Returns:
             Lista unificada ordenada por score fusionado
         """
+        # Usar pesos dinámicos si se proporcionan, sino los por defecto
+        effective_weights = self.weights.copy()
+        if dynamic_weights:
+            if "vector" in dynamic_weights:
+                effective_weights[RetrieverType.VECTOR] = dynamic_weights["vector"]
+            if "bm25" in dynamic_weights:
+                effective_weights[RetrieverType.BM25] = dynamic_weights["bm25"]
+            if "graph" in dynamic_weights:
+                effective_weights[RetrieverType.GRAPH] = dynamic_weights["graph"]
+            logger.info(f"Usando pesos dinámicos: vector={effective_weights[RetrieverType.VECTOR]:.2f}, "
+                       f"bm25={effective_weights[RetrieverType.BM25]:.2f}, "
+                       f"graph={effective_weights[RetrieverType.GRAPH]:.2f}")
+        
         # Acumular scores RRF por chunk_id
         chunk_scores: Dict[str, Dict] = {}
         
@@ -177,7 +193,7 @@ class HybridFusion:
         
         for chunk_id, data in chunk_scores.items():
             total_score = sum(
-                score * self.weights[source]
+                score * effective_weights[source]
                 for source, score in data["rrf_scores"].items()
             )
             
@@ -361,7 +377,8 @@ class UnifiedRetriever:
         bm25_top_k: int = 20,
         graph_top_k: int = 10,
         filters: Optional[Dict] = None,
-        context_hint: Optional[str] = None
+        context_hint: Optional[str] = None,
+        dynamic_weights: Optional[Dict[str, float]] = None
     ) -> List[RetrievalResult]:
         """
         Realiza búsqueda híbrida con re-ranking opcional y HyDE.
@@ -374,6 +391,7 @@ class UnifiedRetriever:
             graph_top_k: Resultados de grafo
             filters: Filtros opcionales
             context_hint: Contexto adicional para HyDE
+            dynamic_weights: Pesos dinámicos desde router {"vector": 0.5, "bm25": 0.3, "graph": 0.2}
             
         Returns:
             Resultados fusionados y ordenados (re-rankeados si está habilitado)
@@ -454,7 +472,8 @@ class UnifiedRetriever:
             bm25_results=bm25_results,
             graph_results=graph_results,
             top_k=top_k,
-            query=query  # Necesario para re-ranking
+            query=query,  # Necesario para re-ranking
+            dynamic_weights=dynamic_weights
         )
         
         return results

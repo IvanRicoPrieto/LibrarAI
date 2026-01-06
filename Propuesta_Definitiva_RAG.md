@@ -210,9 +210,14 @@ Para tu biblioteca de física/computación cuántica, definir ontología:
 ### 4.3 Flujo de Recuperación Agéntica (Deep Research)
 
 ```
-1. CLASIFICAR consulta:
+1. CLASIFICAR consulta y ASIGNAR PESOS DINÁMICOS:
    - Simple (definición directa) → Búsqueda única
    - Compleja (comparación, multi-concepto) → Descomponer
+   - Pesos según tipo detectado:
+     * Términos exactos (BB84, Shor): bm25=0.6, vector=0.3, graph=0.1
+     * Conceptual: vector=0.5, bm25=0.3, graph=0.2
+     * Relacional: graph=0.5, vector=0.3, bm25=0.2
+     * Comparativa: vector=0.4, bm25=0.3, graph=0.3
 
 2. Si compleja, DESCOMPONER en sub-preguntas:
    - "Compara BB84 con E91" → ["¿Qué es BB84?", "¿Qué es E91?", "Diferencias"]
@@ -695,7 +700,7 @@ quantum_library_rag/
 │   │   └── citation_injector.py
 │   │
 │   ├── agents/
-│   │   ├── router.py          # Clasificación de consultas
+│   │   ├── router.py          # Clasificación + pesos dinámicos
 │   │   ├── planner.py         # Descomposición
 │   │   └── critic.py          # Verificación
 │   │

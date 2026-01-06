@@ -373,11 +373,17 @@ class RAGPipeline:
             routing = self._router.route(query)
             logger.info(f"Routing: {routing.strategy.value}")
         
-        # 2. Retrieval
+        # 2. Retrieval con pesos dinámicos del router
         search_kwargs = {"top_k": top_k}
         if routing:
             search_kwargs["vector_top_k"] = int(top_k * (1 + routing.vector_weight))
             search_kwargs["bm25_top_k"] = int(top_k * (1 + routing.bm25_weight))
+            # Pasar pesos dinámicos para la fusión RRF
+            search_kwargs["dynamic_weights"] = {
+                "vector": routing.vector_weight,
+                "bm25": routing.bm25_weight,
+                "graph": routing.graph_weight
+            }
         
         if filters:
             search_kwargs["filters"] = filters
