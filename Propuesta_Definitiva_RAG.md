@@ -20,18 +20,19 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 
 ### 1.2 Características Clave
 
-| Característica   | Descripción                                           |
-| ---------------- | ----------------------------------------------------- |
-| **Integración**  | CLI directa en terminal/VS Code (sin MCP)             |
-| **Búsqueda**     | Híbrida: semántica (vectores) + léxica (BM25) + grafo |
-| **Re-ranking**   | Cross-Encoder opcional para +15-25% precisión         |
-| **Evaluación**   | Pipeline RAGAS: faithfulness, relevancy, precision    |
-| **Cache**        | Embeddings cacheados: -70-90% costes, 0ms latencia    |
-| **Filtrado**     | Por categoría/metadata para reducir ruido de dominios |
-| **Chunking**     | Jerárquico con auto-merge para contexto coherente     |
-| **Citas**        | Rutas de encabezado (ej: `Libro > Cap 3 > Sec 3.2`)   |
-| **Verificación** | Evaluación automática de fidelidad pre-entrega        |
-| **Privacidad**   | Datos 100% locales, solo APIs para LLM de generación  |
+| Característica   | Descripción                                                 |
+| ---------------- | ----------------------------------------------------------- |
+| **Integración**  | CLI directa en terminal/VS Code (sin MCP)                   |
+| **Búsqueda**     | Híbrida: semántica (vectores) + léxica (BM25) + grafo       |
+| **Re-ranking**   | Cross-Encoder opcional para +15-25% precisión               |
+| **HyDE**         | Query expansion con documentos hipotéticos (+10-20% recall) |
+| **Evaluación**   | Pipeline RAGAS: faithfulness, relevancy, precision          |
+| **Cache**        | Embeddings cacheados: -70-90% costes, 0ms latencia          |
+| **Filtrado**     | Por categoría/metadata para reducir ruido de dominios       |
+| **Chunking**     | Jerárquico con auto-merge para contexto coherente           |
+| **Citas**        | Rutas de encabezado (ej: `Libro > Cap 3 > Sec 3.2`)         |
+| **Verificación** | Evaluación automática de fidelidad pre-entrega              |
+| **Privacidad**   | Datos 100% locales, solo APIs para LLM de generación        |
 
 ### 1.3 Stack Tecnológico Recomendado
 
@@ -85,10 +86,10 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
 │         └────────────────┼────────────────┘                      │
 │                          ▼                                       │
-│                 ┌─────────────┐      ┌─────────────┐            │
-│                 │ Fusion +    │ ───▶ │ Re-Ranker   │            │
-│                 │ Auto-Merge  │      │ (opcional)  │            │
-│                 └─────────────┘      └─────────────┘            │
+│  ┌─────────────┐  ┌─────────────┐      ┌─────────────┐          │
+│  │ HyDE        │  │ Fusion +    │ ───▶ │ Re-Ranker   │          │
+│  │ (opcional)  │  │ Auto-Merge  │      │ (opcional)  │          │
+│  └─────────────┘  └─────────────┘      └─────────────┘          │
 └─────────────────────────┬───────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -217,11 +218,12 @@ Para tu biblioteca de física/computación cuántica, definir ontología:
    - "Compara BB84 con E91" → ["¿Qué es BB84?", "¿Qué es E91?", "Diferencias"]
 
 3. Para cada sub-pregunta, BUSCAR:
-   a) Vector search (top-30)
-   b) BM25 search (top-30)
-   c) Graph traversal (si detecta entidad conocida)
-   d) Fusión RRF → top-10
-   e) (Opcional) Re-ranking con Cross-Encoder → top-k refinado
+   a) (Opcional) HyDE: Generar documentos hipotéticos → embedding multi-query
+   b) Vector search (top-30)
+   c) BM25 search (top-30)
+   d) Graph traversal (si detecta entidad conocida)
+   e) Fusión RRF → top-10
+   f) (Opcional) Re-ranking con Cross-Encoder → top-k refinado
 
 4. EVALUAR suficiencia (Critic):
    - ¿Los fragmentos cubren la pregunta?
@@ -682,7 +684,10 @@ quantum_library_rag/
 │   │   ├── vector_retriever.py
 │   │   ├── bm25_retriever.py
 │   │   ├── graph_retriever.py
-│   │   └── fusion.py          # RRF + Auto-merge
+│   │   ├── fusion.py          # RRF + Auto-merge
+│   │   ├── reranker.py        # Cross-Encoder re-ranking
+│   │   ├── cache.py           # Cache de embeddings
+│   │   └── hyde.py            # HyDE Query Expansion
 │   │
 │   ├── generation/
 │   │   ├── prompt_builder.py

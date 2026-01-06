@@ -267,7 +267,9 @@ class RAGPipeline:
         use_critic: bool = False,
         use_reranker: bool = False,
         reranker_preset: str = "balanced",
-        use_cache: bool = True
+        use_cache: bool = True,
+        use_hyde: bool = False,
+        hyde_domain: str = "quantum_computing"
     ):
         self.indices_dir = indices_dir
         self.config = config
@@ -277,6 +279,8 @@ class RAGPipeline:
         self.use_reranker = use_reranker
         self.reranker_preset = reranker_preset
         self.use_cache = use_cache
+        self.use_hyde = use_hyde
+        self.hyde_domain = hyde_domain
         
         # Componentes (lazy init)
         self._retriever = None
@@ -302,6 +306,10 @@ class RAGPipeline:
         use_reranker = self.use_reranker or retrieval_config.get("reranker", {}).get("enabled", False)
         reranker_preset = self.reranker_preset or retrieval_config.get("reranker", {}).get("preset", "balanced")
         
+        # Determinar si usar HyDE: CLI flag tiene prioridad sobre config
+        use_hyde = self.use_hyde or retrieval_config.get("hyde", {}).get("enabled", False)
+        hyde_domain = self.hyde_domain or retrieval_config.get("hyde", {}).get("domain", "quantum_computing")
+        
         self._retriever = UnifiedRetriever(
             indices_dir=self.indices_dir,
             vector_weight=retrieval_config.get("vector_weight", 0.5),
@@ -310,7 +318,9 @@ class RAGPipeline:
             use_graph=self.config.get("graph", {}).get("enabled", True),
             use_reranker=use_reranker,
             reranker_preset=reranker_preset,
-            use_cache=self.use_cache
+            use_cache=self.use_cache,
+            use_hyde=use_hyde,
+            hyde_domain=hyde_domain
         )
         
         gen_config = self.config.get("generation", {})
@@ -850,6 +860,19 @@ Ejemplos:
     )
     
     parser.add_argument(
+        '--hyde',
+        action='store_true',
+        help='Activar HyDE (Hypothetical Document Embeddings) para mejorar recall (+10-20%% en queries abstractas)'
+    )
+    
+    parser.add_argument(
+        '--hyde-domain',
+        choices=['quantum_computing', 'quantum_information', 'quantum_cryptography', 'general_physics', 'mathematics'],
+        default='quantum_computing',
+        help='Dominio para generación HyDE (default: quantum_computing)'
+    )
+    
+    parser.add_argument(
         '--cache-stats',
         action='store_true',
         help='Mostrar estadísticas del cache de embeddings'
@@ -971,7 +994,9 @@ Ejemplos:
             use_critic=args.critic,
             use_reranker=args.rerank,
             reranker_preset=args.rerank_preset,
-            use_cache=not args.no_cache
+            use_cache=not args.no_cache,
+            use_hyde=args.hyde,
+            hyde_domain=args.hyde_domain
         )
     except Exception as e:
         logger.error(f"Error inicializando pipeline: {e}")

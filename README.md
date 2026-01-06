@@ -92,6 +92,15 @@ python -m src.cli.ask_library "Teorema de No-Clonación" --rerank
 # Re-ranking con preset de máxima calidad
 python -m src.cli.ask_library "Ecuación de Schrödinger" --rerank --rerank-preset quality
 
+# HyDE para mejorar recall (+10-20% en queries abstractas)
+python -m src.cli.ask_library "¿Cómo funciona la teleportación cuántica?" --hyde
+
+# HyDE con dominio específico
+python -m src.cli.ask_library "Protocolos de distribución de claves" --hyde --hyde-domain quantum_cryptography
+
+# Combinar HyDE + Re-ranking (máxima calidad)
+python -m src.cli.ask_library "Deriva la ecuación de Schrödinger" --hyde --rerank
+
 # Ejecutar código de la respuesta
 python -m src.cli.ask_library "Calcula entropía de von Neumann" --exec
 
@@ -145,6 +154,24 @@ python -m src.cli.ask_library "¿Qué es un qubit?" --filter category:computacio
 
 # Múltiples filtros
 python -m src.cli.ask_library "BB84" --filter category:comunicacion_cuantica --filter doc_title:Nielsen
+```
+
+### HyDE (Query Expansion)
+
+HyDE (Hypothetical Document Embeddings) mejora el recall generando documentos hipotéticos que responderían la pregunta, y luego buscando documentos similares. Especialmente útil para:
+
+- Queries abstractas o conceptuales
+- Preguntas que no contienen términos técnicos exactos
+- Búsquedas exploratorias
+
+```bash
+# Activar HyDE
+python -m src.cli.ask_library "¿Cómo se mantiene la coherencia cuántica?" --hyde
+
+# HyDE con dominio específico
+python -m src.cli.ask_library "Seguridad en QKD" --hyde --hyde-domain quantum_cryptography
+
+# Dominios disponibles: quantum_computing, quantum_information, quantum_cryptography, general_physics, mathematics
 ```
 
 ### Qdrant en Docker (Recomendado para >20K chunks)

@@ -289,6 +289,7 @@ class UnifiedRetriever:
     - Configuración de pesos
     - Re-ranking opcional con cross-encoder
     - Cache de embeddings para reducir costes
+    - HyDE (Hypothetical Document Embeddings) para mejor recall
     """
     
     def __init__(
@@ -300,7 +301,9 @@ class UnifiedRetriever:
         use_graph: bool = True,
         use_reranker: bool = False,
         reranker_preset: str = "balanced",  # "fast", "balanced", "quality", "max_quality"
-        use_cache: bool = True
+        use_cache: bool = True,
+        use_hyde: bool = False,
+        hyde_domain: str = "quantum_computing"
     ):
         """
         Args:
@@ -312,6 +315,8 @@ class UnifiedRetriever:
             use_reranker: Si aplicar cross-encoder para re-ranking
             reranker_preset: Preset del reranker si use_reranker=True
             use_cache: Si usar cache de embeddings
+            use_hyde: Si usar HyDE para expandir queries
+            hyde_domain: Dominio para generación de documentos hipotéticos
         """
         from pathlib import Path
         from .vector_retriever import VectorRetriever
@@ -322,11 +327,19 @@ class UnifiedRetriever:
         self.use_graph = use_graph
         self.use_reranker = use_reranker
         self.use_cache = use_cache
+        self.use_hyde = use_hyde
+        self.hyde_domain = hyde_domain
         
         # Inicializar retrievers
         self.vector_retriever = VectorRetriever(self.indices_dir, use_cache=use_cache)
         self.bm25_retriever = BM25Retriever(self.indices_dir)
         self.graph_retriever = GraphRetriever(self.indices_dir) if use_graph else None
+        
+        # Inicializar HyDE expander si está habilitado
+        self.hyde_expander = None
+        if use_hyde:
+            from .hyde import get_hyde_expander
+            self.hyde_expander = get_hyde_expander()
         
         # Fusión con reranker opcional
         self.fusion = HybridFusion(
@@ -347,10 +360,11 @@ class UnifiedRetriever:
         vector_top_k: int = 20,
         bm25_top_k: int = 20,
         graph_top_k: int = 10,
-        filters: Optional[Dict] = None
+        filters: Optional[Dict] = None,
+        context_hint: Optional[str] = None
     ) -> List[RetrievalResult]:
         """
-        Realiza búsqueda híbrida con re-ranking opcional.
+        Realiza búsqueda híbrida con re-ranking opcional y HyDE.
         
         Args:
             query: Consulta en lenguaje natural
@@ -359,18 +373,68 @@ class UnifiedRetriever:
             bm25_top_k: Resultados de BM25
             graph_top_k: Resultados de grafo
             filters: Filtros opcionales
+            context_hint: Contexto adicional para HyDE
             
         Returns:
             Resultados fusionados y ordenados (re-rankeados si está habilitado)
         """
-        # Búsqueda vectorial
-        vector_results = self.vector_retriever.search(
-            query,
-            top_k=vector_top_k,
-            filters=filters
-        )
+        # Si HyDE está habilitado, expandir query con documentos hipotéticos
+        search_query = query
+        hyde_texts = []
         
-        # Búsqueda BM25
+        if self.use_hyde and self.hyde_expander:
+            try:
+                hyde_result = self.hyde_expander.expand_query(
+                    query=query,
+                    context_hint=context_hint,
+                    domain=self.hyde_domain,
+                    num_hypothetical=2
+                )
+                # Usar los textos de HyDE para múltiples búsquedas
+                hyde_texts = self.hyde_expander.get_embedding_texts(
+                    query=query,
+                    context_hint=context_hint,
+                    domain=self.hyde_domain,
+                    include_original=True,
+                    num_hypothetical=2
+                )
+            except Exception as e:
+                import logging
+                logging.warning(f"HyDE expansion failed, falling back to original query: {e}")
+        
+        # Búsqueda vectorial (con HyDE si está habilitado)
+        if hyde_texts:
+            # Búsqueda multi-query con pesos
+            all_vector_results = []
+            for text, weight in hyde_texts:
+                results = self.vector_retriever.search(
+                    text,
+                    top_k=vector_top_k,
+                    filters=filters
+                )
+                # Ajustar scores por peso
+                for r in results:
+                    r.score *= weight
+                all_vector_results.extend(results)
+            
+            # Deduplicar y promediar scores
+            seen = {}
+            for r in all_vector_results:
+                if r.chunk_id in seen:
+                    # Promediar score
+                    seen[r.chunk_id].score = (seen[r.chunk_id].score + r.score) / 2
+                else:
+                    seen[r.chunk_id] = r
+            
+            vector_results = sorted(seen.values(), key=lambda x: x.score, reverse=True)[:vector_top_k]
+        else:
+            vector_results = self.vector_retriever.search(
+                search_query,
+                top_k=vector_top_k,
+                filters=filters
+            )
+        
+        # Búsqueda BM25 (siempre usa query original para keyword matching)
         bm25_results = self.bm25_retriever.search(
             query,
             top_k=bm25_top_k
