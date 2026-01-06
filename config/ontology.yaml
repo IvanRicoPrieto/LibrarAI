@@ -1,0 +1,242 @@
+# =============================================================================
+# ONTOLOGÍA PARA GRAFO DE CONOCIMIENTO - Computación Cuántica
+# =============================================================================
+# Define las entidades y relaciones para el dominio de física cuántica,
+# información cuántica y computación cuántica.
+
+# -----------------------------------------------------------------------------
+# Entidades (Nodos del Grafo)
+# -----------------------------------------------------------------------------
+entities:
+  # Algoritmos cuánticos
+  Algoritmo:
+    description: "Algoritmo cuántico o protocolo computacional"
+    examples:
+      - "Algoritmo de Shor"
+      - "Algoritmo de Grover"
+      - "VQE"
+      - "QAOA"
+      - "Algoritmo de Deutsch-Jozsa"
+    extraction_patterns:
+      - "algoritmo de {name}"
+      - "{name} algorithm"
+      - "el algoritmo {name}"
+
+  # Protocolos de comunicación cuántica
+  Protocolo:
+    description: "Protocolo de comunicación o criptografía cuántica"
+    examples:
+      - "BB84"
+      - "E91"
+      - "B92"
+      - "SARG04"
+      - "CV-QKD"
+      - "DV-QKD"
+    extraction_patterns:
+      - "protocolo {name}"
+      - "{name} protocol"
+      - "el protocolo de {name}"
+
+  # Conceptos fundamentales
+  Concepto:
+    description: "Concepto físico o matemático fundamental"
+    examples:
+      - "Entrelazamiento"
+      - "Superposición"
+      - "Decoherencia"
+      - "Fidelidad"
+      - "Pureza"
+      - "Entropía de von Neumann"
+      - "Operador densidad"
+      - "Esfera de Bloch"
+      - "Gate cuántico"
+      - "Qubit"
+    extraction_patterns:
+      - "el concepto de {name}"
+      - "{name} se define como"
+      - "definimos {name}"
+
+  # Teoremas y resultados
+  Teorema:
+    description: "Teorema, lema, corolario o resultado demostrado"
+    examples:
+      - "Teorema de No-Clonación"
+      - "Desigualdades de Bell"
+      - "Teorema de Holevo"
+      - "Cota de Tsirelson"
+      - "Teorema de Gottesman-Knill"
+    extraction_patterns:
+      - "teorema de {name}"
+      - "{name} theorem"
+      - "el teorema {name}"
+
+  # Puertas cuánticas
+  Gate:
+    description: "Puerta u operación cuántica"
+    examples:
+      - "Hadamard"
+      - "CNOT"
+      - "Toffoli"
+      - "Pauli-X"
+      - "Pauli-Y"
+      - "Pauli-Z"
+      - "Phase gate"
+      - "T gate"
+      - "SWAP"
+    extraction_patterns:
+      - "puerta {name}"
+      - "{name} gate"
+      - "la gate {name}"
+
+  # Autores/Investigadores
+  Autor:
+    description: "Autor, investigador o científico"
+    examples:
+      - "Nielsen"
+      - "Chuang"
+      - "Preskill"
+      - "Bennett"
+      - "Brassard"
+      - "Shor"
+      - "Grover"
+      - "Deutsch"
+    extraction_patterns:
+      - "según {name}"
+      - "{name} et al."
+      - "{name} demostró"
+
+  # Documentos
+  Documento:
+    description: "Libro, paper o documento de referencia"
+    examples:
+      - "Nielsen & Chuang"
+      - "Preskill Notes"
+      - "Watrous"
+    extraction_patterns:
+      - "en {name}"
+      - "según {name}"
+
+  # Hardware cuántico
+  Hardware:
+    description: "Plataforma o tecnología de hardware cuántico"
+    examples:
+      - "Superconductores"
+      - "Iones atrapados"
+      - "Fotones"
+      - "NV centers"
+      - "Átomos neutros"
+      - "Topológico"
+    extraction_patterns:
+      - "qubits de {name}"
+      - "tecnología {name}"
+      - "plataforma {name}"
+
+# -----------------------------------------------------------------------------
+# Relaciones (Aristas del Grafo)
+# -----------------------------------------------------------------------------
+relations:
+  MEJORA:
+    description: "Un algoritmo/protocolo mejora a otro"
+    source_types: ["Algoritmo", "Protocolo"]
+    target_types: ["Algoritmo", "Protocolo"]
+    examples:
+      - "Grover mejora la búsqueda clásica"
+      - "SARG04 mejora BB84"
+
+  DEPENDE_DE:
+    description: "Un concepto/algoritmo depende de otro"
+    source_types: ["Algoritmo", "Protocolo", "Concepto", "Teorema"]
+    target_types: ["Concepto", "Teorema", "Gate"]
+    examples:
+      - "BB84 depende del teorema de no-clonación"
+      - "VQE depende de estados variacionales"
+
+  USA:
+    description: "Un algoritmo/protocolo usa una gate o concepto"
+    source_types: ["Algoritmo", "Protocolo"]
+    target_types: ["Gate", "Concepto"]
+    examples:
+      - "Grover usa Hadamard"
+      - "Shor usa QFT"
+
+  DEFINE:
+    description: "Un documento define un concepto/teorema"
+    source_types: ["Documento"]
+    target_types: ["Concepto", "Teorema", "Algoritmo", "Protocolo"]
+    examples:
+      - "Nielsen & Chuang define el teorema de no-clonación"
+
+  CITA:
+    description: "Un documento cita a otro"
+    source_types: ["Documento"]
+    target_types: ["Documento"]
+    examples:
+      - "Paper X cita a Nielsen & Chuang"
+
+  IMPLEMENTA:
+    description: "Un hardware implementa un algoritmo/protocolo"
+    source_types: ["Hardware"]
+    target_types: ["Algoritmo", "Protocolo", "Gate"]
+    examples:
+      - "Superconductores implementan CNOT"
+
+  DEMUESTRA:
+    description: "Un autor demuestra un teorema"
+    source_types: ["Autor"]
+    target_types: ["Teorema"]
+    examples:
+      - "Wootters y Zurek demostraron no-clonación"
+
+  PROPONE:
+    description: "Un autor propone un algoritmo/protocolo"
+    source_types: ["Autor"]
+    target_types: ["Algoritmo", "Protocolo"]
+    examples:
+      - "Shor propuso el algoritmo de factorización"
+      - "Bennett y Brassard propusieron BB84"
+
+  ES_CASO_DE:
+    description: "Un concepto es caso particular de otro más general"
+    source_types: ["Concepto", "Algoritmo", "Protocolo"]
+    target_types: ["Concepto"]
+    examples:
+      - "BB84 es caso de QKD"
+      - "Estado de Bell es caso de estado entrelazado"
+
+  EQUIVALE_A:
+    description: "Dos conceptos son equivalentes"
+    source_types: ["Concepto", "Gate"]
+    target_types: ["Concepto", "Gate"]
+    examples:
+      - "NOT cuántico equivale a Pauli-X"
+
+# -----------------------------------------------------------------------------
+# Reglas de Extracción
+# -----------------------------------------------------------------------------
+extraction_rules:
+  # Patrones para detectar definiciones
+  definition_patterns:
+    - "se define como"
+    - "definimos"
+    - "es el/la"
+    - "consiste en"
+    - "se conoce como"
+
+  # Patrones para detectar relaciones
+  relation_patterns:
+    mejora:
+      - "{A} mejora {B}"
+      - "{A} es más eficiente que {B}"
+      - "{A} supera a {B}"
+    depende:
+      - "{A} depende de {B}"
+      - "{A} requiere {B}"
+      - "{A} se basa en {B}"
+      - "{A} utiliza {B}"
+    usa:
+      - "{A} usa {B}"
+      - "{A} emplea {B}"
+      - "{A} aplica {B}"
+
+  # Umbral de confianza mínimo para extraer
+  min_confidence: 0.7

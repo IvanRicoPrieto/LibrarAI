@@ -1,0 +1,182 @@
+# =============================================================================
+# QUANTUM LIBRARY RAG - Configuración Principal
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Rutas del proyecto
+# -----------------------------------------------------------------------------
+paths:
+  data_dir: "data"
+  books_dir: "data/books"
+  papers_dir: "data/papers"
+  indices_dir: "indices"
+  logs_dir: "logs"
+  outputs_dir: "outputs"
+  manifest_file: "indices/manifest.json"
+  cost_tracking_file: "logs/cost_tracking.csv"
+
+# -----------------------------------------------------------------------------
+# Configuración de Embeddings
+# -----------------------------------------------------------------------------
+embedding:
+  provider: "openai" # opciones: "openai", "local"
+  model: "text-embedding-3-large"
+  dimensions: 3072 # text-embedding-3-large usa 3072 dimensiones nativas
+  batch_size: 100
+
+  # Para modo local (BGE-M3)
+  local:
+    model_name: "BAAI/bge-m3"
+    device: "cpu" # "cuda" si tienes GPU
+
+# -----------------------------------------------------------------------------
+# Configuración de Chunking Jerárquico
+# -----------------------------------------------------------------------------
+chunking:
+  # Tamaños en tokens
+  micro_size: 200 # Definiciones, teoremas, fórmulas
+  meso_size: 512 # Párrafos relacionados
+  macro_size: 2048 # Sección/subcapítulo completo
+
+  # Solapamiento entre chunks
+  overlap: 50
+
+  # Separadores para división
+  separators:
+    - "\n## " # Encabezados nivel 2
+    - "\n### " # Encabezados nivel 3
+    - "\n#### " # Encabezados nivel 4
+    - "\n\n" # Párrafos
+    - "\n" # Líneas
+    - " " # Palabras
+
+# -----------------------------------------------------------------------------
+# Configuración de Recuperación
+# -----------------------------------------------------------------------------
+retrieval:
+  # Búsqueda vectorial
+  vector_top_k: 30
+
+  # Búsqueda BM25
+  bm25_top_k: 30
+
+  # Fusión RRF
+  rrf_k: 60 # Constante para Reciprocal Rank Fusion
+  fusion_top_k: 10
+
+  # Selección final
+  final_top_k: 5
+
+  # Auto-merge: umbral para consolidar chunks hermanos
+  auto_merge_threshold: 0.5 # 50% de hijos = devolver padre
+
+  # Umbral mínimo de similitud para considerar relevante
+  min_similarity_threshold: 0.65
+
+# -----------------------------------------------------------------------------
+# Configuración de Generación
+# -----------------------------------------------------------------------------
+generation:
+  provider: "anthropic" # opciones: "anthropic", "openai", "local"
+  model: "claude-sonnet-4-5-20250929" # Claude Sonnet 4.5
+  temperature: 0.3
+  max_tokens: 2000
+
+  # Alternativas
+  openai:
+    model: "gpt-4.1"
+  local:
+    model: "llama-3.3-70b"
+    base_url: "http://localhost:8000/v1"
+
+# -----------------------------------------------------------------------------
+# Configuración de Ruteo/Planning
+# -----------------------------------------------------------------------------
+routing:
+  provider: "openai"
+  model: "gpt-4.1-mini"
+  temperature: 0.1
+  max_tokens: 500
+
+# -----------------------------------------------------------------------------
+# Configuración de Verificación (Critic)
+# -----------------------------------------------------------------------------
+verification:
+  enabled: true
+  fidelity_threshold: 0.9 # Mínimo 90% de afirmaciones con cita válida
+  max_unsupported_claims: 2 # Máximo de afirmaciones sin soporte antes de abstención
+
+# -----------------------------------------------------------------------------
+# Configuración del Grafo de Conocimiento
+# -----------------------------------------------------------------------------
+knowledge_graph:
+  enabled: true
+  storage: "networkx" # opciones: "networkx", "neo4j"
+
+  # Para Neo4j (si se usa)
+  neo4j:
+    uri: "bolt://localhost:7687"
+    user: "neo4j"
+    password: ""
+
+# -----------------------------------------------------------------------------
+# Configuración de Qdrant (Vector DB)
+# -----------------------------------------------------------------------------
+qdrant:
+  mode: "local" # opciones: "local", "docker", "cloud"
+
+  # Modo local (persistencia en disco)
+  local:
+    path: "indices/qdrant"
+
+  # Modo Docker
+  docker:
+    host: "localhost"
+    port: 6333
+
+  # Colección
+  collection_name: "quantum_library"
+
+# -----------------------------------------------------------------------------
+# Configuración de Ejecución de Código (Sandbox)
+# -----------------------------------------------------------------------------
+code_execution:
+  enabled: true
+  timeout_seconds: 30
+  max_memory_mb: 512
+
+  allowed_imports:
+    - "numpy"
+    - "scipy"
+    - "matplotlib"
+    - "sympy"
+    - "qutip"
+    - "pandas"
+    - "math"
+    - "cmath"
+
+  blocked_imports:
+    - "os"
+    - "sys"
+    - "subprocess"
+    - "socket"
+    - "requests"
+    - "urllib"
+
+# -----------------------------------------------------------------------------
+# Configuración de Logging
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO" # DEBUG, INFO, WARNING, ERROR
+  format: "json" # "json" o "text"
+  save_sessions: true
+  max_session_files: 100
+
+# -----------------------------------------------------------------------------
+# Configuración de CLI
+# -----------------------------------------------------------------------------
+cli:
+  default_mode: "normal" # "normal", "verbose", "deep"
+  show_cost: true
+  show_time: true
+  output_format: "markdown" # "markdown", "plain", "json"
