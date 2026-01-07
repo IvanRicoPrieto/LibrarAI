@@ -9,6 +9,7 @@ Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Fí
 - **📝 Evaluación RAGAS**: Pipeline de evaluación con métricas de calidad RAG
 - **💾 Cache de Embeddings**: Reduce costes 70-90% y elimina latencia en queries repetidas
 - **💰 Caché Semántico**: Reutiliza respuestas para queries similares (100% ahorro por hit)
+- **📦 Compresión de Contexto**: Reduce tokens 30-60%, permite más contexto por consulta
 - **🧠 Chunking Semántico**: Detecta límites naturales (definiciones, teoremas, demostraciones)
 - **📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
 - **📝 Citas precisas**: Referencias `[n]` a fuentes específicas con ubicación
@@ -104,6 +105,12 @@ python -m src.cli.ask_library "Protocolos de distribución de claves" --hyde --h
 
 # Combinar HyDE + Re-ranking (máxima calidad)
 python -m src.cli.ask_library "Deriva la ecuación de Schrödinger" --hyde --rerank
+
+# Compresión de contexto (permite más chunks en el presupuesto de tokens)
+python -m src.cli.ask_library "Compara todos los protocolos QKD" --compress --top-k 20
+
+# Compresión agresiva (reduce 60% de tokens)
+python -m src.cli.ask_library "Resumen completo del algoritmo de Shor" --compress --compress-level aggressive
 
 # Ejecutar código de la respuesta
 python -m src.cli.ask_library "Calcula entropía de von Neumann" --exec
@@ -261,6 +268,36 @@ python -m src.cli.ask_library --clear-semantic-cache
 - TTL de 7 días por defecto
 - Almacena respuesta + fuentes + routing para reproducibilidad perfecta
 - Cache hit = 0 tokens consumidos (100% ahorro en esa query)
+
+### Compresión de Contexto
+
+Comprime el contexto para incluir más información en el presupuesto de tokens del LLM:
+
+```bash
+# Compresión media (default: ~40% reducción)
+python -m src.cli.ask_library "Resumen de todos los protocolos QKD" --compress --top-k 20
+
+# Compresión ligera (~20% reducción, preserva más detalle)
+python -m src.cli.ask_library "Explica BB84" --compress --compress-level light
+
+# Compresión agresiva (~60% reducción, para síntesis amplias)
+python -m src.cli.ask_library "Estado del arte en computación cuántica" --compress --compress-level aggressive
+```
+
+**Niveles de compresión:**
+
+| Nivel      | Reducción | Caso de uso                        |
+| ---------- | --------- | ---------------------------------- |
+| light      | ~20%      | Limpieza básica, preserva detalles |
+| medium     | ~40%      | Balance entre cobertura y detalle  |
+| aggressive | ~60%      | Síntesis amplia, muchas fuentes    |
+
+**Elementos preservados:**
+
+- Fórmulas LaTeX (`$...$`, `$$...$$`)
+- Bloques de código
+- Marcadores de cita `[n]`
+- Palabras clave técnicas (qubit, entanglement, etc.)
 
 ## 🏗️ Arquitectura
 

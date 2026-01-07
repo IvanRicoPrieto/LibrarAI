@@ -68,6 +68,8 @@ source .venv/bin/activate && python -m src.cli.ask_library "PREGUNTA"
 | `--rerank-preset`        | -     | choice | balanced          | Preset: fast, balanced, quality, max_quality              |
 | `--hyde`                 | -     | flag   | false             | HyDE: Query expansion para mejorar recall (+10-20%)       |
 | `--hyde-domain`          | -     | choice | quantum_computing | Dominio HyDE: quantum_computing, quantum_information, etc |
+| `--compress`             | -     | flag   | false             | Comprimir contexto (reduce tokens 30-60%)                 |
+| `--compress-level`       | -     | choice | medium            | Nivel: light (~20%), medium (~40%), aggressive (~60%)     |
 | `--no-cache`             | -     | flag   | false             | Deshabilitar cache de embeddings                          |
 | `--cache-stats`          | -     | flag   | false             | Mostrar estadísticas del cache de embeddings              |
 | `--no-semantic-cache`    | -     | flag   | false             | Desactivar caché semántico (fuerza regeneración)          |

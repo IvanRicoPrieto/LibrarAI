@@ -5,6 +5,7 @@ Soporta:
 - Templates para diferentes tipos de consulta
 - Inyección de contexto con metadatos
 - Formateo de citas
+- Compresión de contexto (opcional)
 """
 
 from typing import List, Dict, Optional, Any
@@ -230,6 +231,19 @@ Desarrolla la matemática paso a paso, citando las fuentes.""",
             default_type: Tipo de query por defecto
         """
         self.default_type = default_type
+        self._compressor = None
+    
+    def _get_compressor(self):
+        """Obtiene el compresor de contexto (lazy loading)."""
+        if self._compressor is None:
+            try:
+                from .context_compressor import get_context_compressor, CompressionConfig, CompressionLevel
+                config = CompressionConfig(level=CompressionLevel.MEDIUM)
+                self._compressor = get_context_compressor(config)
+            except ImportError:
+                logger.debug("Compresor de contexto no disponible")
+                self._compressor = False  # Marker para no reintentar
+        return self._compressor if self._compressor else None
     
     def detect_query_type(self, query: str) -> QueryType:
         """
@@ -257,7 +271,8 @@ Desarrolla la matemática paso a paso, citando las fuentes.""",
         results: List[RetrievalResult],
         query_type: Optional[QueryType] = None,
         max_context_tokens: int = 4000,
-        include_metadata: bool = True
+        include_metadata: bool = True,
+        compress_context: bool = False
     ) -> Dict[str, str]:
         """
         Construye el prompt completo para el LLM.
@@ -268,6 +283,7 @@ Desarrolla la matemática paso a paso, citando las fuentes.""",
             query_type: Tipo de query (auto-detectado si None)
             max_context_tokens: Límite de tokens para contexto
             include_metadata: Si incluir metadatos en contexto
+            compress_context: Si comprimir contexto para caber en límite
             
         Returns:
             Dict con 'system' y 'user' messages
@@ -298,6 +314,22 @@ Desarrolla la matemática paso a paso, citando las fuentes.""",
             contexts.append(context)
             total_tokens += chunk_tokens
         
+        # Comprimir contexto si está habilitado y excede el límite
+        compression_stats = None
+        if compress_context and total_tokens > max_context_tokens * 0.8:
+            compressor = self._get_compressor()
+            if compressor:
+                contexts, compression_stats = compressor.compress_contexts(
+                    contexts, 
+                    max_total_tokens=max_context_tokens
+                )
+                if compression_stats.get("compression_applied"):
+                    logger.info(
+                        f"Contexto comprimido: {compression_stats['original_tokens']} → "
+                        f"{compression_stats['compressed_tokens']} tokens "
+                        f"({compression_stats['compression_ratio']:.1%})"
+                    )
+        
         # Metadata para el template
         metadata = {
             "doc_title": results[0].doc_title if results else "",
@@ -306,6 +338,10 @@ Desarrolla la matemática paso a paso, citando las fuentes.""",
         
         # Formatear
         prompt = template.format(query, contexts, metadata)
+        
+        # Añadir stats de compresión si aplica
+        if compression_stats:
+            prompt["_compression_stats"] = compression_stats
         
         logger.info(
             f"Prompt construido: tipo={query_type.value}, "

@@ -271,7 +271,9 @@ class RAGPipeline:
         use_hyde: bool = False,
         hyde_domain: str = "quantum_computing",
         use_semantic_cache: bool = True,
-        semantic_cache_threshold: float = 0.92
+        semantic_cache_threshold: float = 0.92,
+        compress_context: bool = False,
+        compress_level: str = "medium"
     ):
         self.indices_dir = indices_dir
         self.config = config
@@ -285,6 +287,8 @@ class RAGPipeline:
         self.hyde_domain = hyde_domain
         self.use_semantic_cache = use_semantic_cache
         self.semantic_cache_threshold = semantic_cache_threshold
+        self.compress_context = compress_context
+        self.compress_level = compress_level
         
         # Componentes (lazy init)
         self._retriever = None
@@ -293,6 +297,7 @@ class RAGPipeline:
         self._critic = None
         self._citation_injector = None
         self._semantic_cache = None
+        self._context_compressor = None
     
     def _init_components(self):
         """Inicializa componentes del pipeline."""
@@ -359,6 +364,26 @@ class RAGPipeline:
             except Exception as e:
                 logger.warning(f"No se pudo inicializar caché semántico: {e}")
                 self._semantic_cache = None
+        
+        # Compresor de contexto
+        if self.compress_context:
+            try:
+                from ..generation.context_compressor import (
+                    ContextCompressor, CompressionConfig, CompressionLevel
+                )
+                level_map = {
+                    "light": CompressionLevel.LIGHT,
+                    "medium": CompressionLevel.MEDIUM,
+                    "aggressive": CompressionLevel.AGGRESSIVE
+                }
+                config = CompressionConfig(
+                    level=level_map.get(self.compress_level, CompressionLevel.MEDIUM)
+                )
+                self._context_compressor = ContextCompressor(config)
+                logger.info(f"Compresor de contexto inicializado (nivel: {self.compress_level})")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar compresor: {e}")
+                self._context_compressor = None
     
     def ask(
         self,
@@ -524,13 +549,52 @@ class RAGPipeline:
                 latency_ms=0
             ), sources, routing
         
-        # 3. Generation
+        # 2.7 Compresión de contexto (si habilitada)
+        compressed_sources = sources
+        compression_stats = None
+        if self._context_compressor and sources:
+            try:
+                contexts = [s.content for s in sources]
+                compressed_contexts, compression_stats = self._context_compressor.compress_contexts(
+                    contexts,
+                    max_total_tokens=4000  # Presupuesto de tokens para contexto
+                )
+                
+                if compression_stats.get("compression_applied"):
+                    # Actualizar sources con contenido comprimido
+                    from ..retrieval.fusion import RetrievalResult
+                    compressed_sources = [
+                        RetrievalResult(
+                            chunk_id=s.chunk_id,
+                            content=compressed_contexts[i],
+                            score=s.score,
+                            doc_id=s.doc_id,
+                            doc_title=s.doc_title,
+                            header_path=s.header_path,
+                            retriever_type=s.retriever_type
+                        )
+                        for i, s in enumerate(sources) if i < len(compressed_contexts)
+                    ]
+                    logger.info(
+                        f"📦 Contexto comprimido: {compression_stats['original_tokens']} → "
+                        f"{compression_stats['compressed_tokens']} tokens "
+                        f"({compression_stats['compression_ratio']:.1%})"
+                    )
+            except Exception as e:
+                logger.warning(f"Error comprimiendo contexto: {e}")
+                compressed_sources = sources
+        
+        # 3. Generation (usando sources comprimidas si aplica)
         response = self._synthesizer.generate(
             query=query,
-            results=sources,
+            results=compressed_sources,
             stream=stream,
             stream_callback=stream_callback
         )
+        
+        # Añadir stats de compresión a metadata
+        if compression_stats:
+            response.metadata["compression"] = compression_stats
         
         # 4. Crítica (si habilitada)
         if self._critic:
@@ -1044,6 +1108,19 @@ Ejemplos:
     )
     
     parser.add_argument(
+        '--compress',
+        action='store_true',
+        help='Comprimir contexto para incluir más chunks en el presupuesto de tokens (reduce 30-50%%)'
+    )
+    
+    parser.add_argument(
+        '--compress-level',
+        choices=['light', 'medium', 'aggressive'],
+        default='medium',
+        help='Nivel de compresión de contexto: light (~20%%), medium (~40%%), aggressive (~60%%)'
+    )
+    
+    parser.add_argument(
         '--cache-stats',
         action='store_true',
         help='Mostrar estadísticas del cache de embeddings'
@@ -1231,6 +1308,10 @@ Ejemplos:
     # Determinar si usar caché semántico
     use_semantic_cache = not args.no_semantic_cache
     
+    # Determinar si usar compresión
+    compress_context = args.compress
+    compress_level = args.compress_level
+    
     # Crear pipeline
     try:
         pipeline = RAGPipeline(
@@ -1245,7 +1326,9 @@ Ejemplos:
             use_hyde=args.hyde,
             hyde_domain=args.hyde_domain,
             use_semantic_cache=use_semantic_cache,
-            semantic_cache_threshold=args.cache_threshold
+            semantic_cache_threshold=args.cache_threshold,
+            compress_context=compress_context,
+            compress_level=compress_level
         )
     except Exception as e:
         logger.error(f"Error inicializando pipeline: {e}")
