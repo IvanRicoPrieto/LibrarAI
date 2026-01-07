@@ -627,13 +627,18 @@ class LibraryIndexer:
         # Crear puntos para Qdrant
         points = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            # Extraer categoría del file_path (primera carpeta)
+            # Extraer categoría del file_path (subcarpeta temática)
+            # Estructura: books/computacion_cuantica/... o papers/qkd/...
+            # parts[0] = "books" o "papers", parts[1] = categoría temática
             category = "general"
             if file_paths and chunk.doc_id in file_paths:
                 path = file_paths[chunk.doc_id]
                 parts = path.split("/")
-                if len(parts) > 1:
-                    # Usar primera subcarpeta como categoría
+                if len(parts) > 2:
+                    # Usar subcarpeta temática como categoría (ej: computacion_cuantica)
+                    category = parts[1]
+                elif len(parts) > 1:
+                    # Fallback a primera carpeta si no hay subcarpeta
                     category = parts[0]
             
             point = PointStruct(
