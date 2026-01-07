@@ -269,7 +269,9 @@ class RAGPipeline:
         reranker_preset: str = "balanced",
         use_cache: bool = True,
         use_hyde: bool = False,
-        hyde_domain: str = "quantum_computing"
+        hyde_domain: str = "quantum_computing",
+        use_semantic_cache: bool = True,
+        semantic_cache_threshold: float = 0.92
     ):
         self.indices_dir = indices_dir
         self.config = config
@@ -281,6 +283,8 @@ class RAGPipeline:
         self.use_cache = use_cache
         self.use_hyde = use_hyde
         self.hyde_domain = hyde_domain
+        self.use_semantic_cache = use_semantic_cache
+        self.semantic_cache_threshold = semantic_cache_threshold
         
         # Componentes (lazy init)
         self._retriever = None
@@ -288,6 +292,7 @@ class RAGPipeline:
         self._router = None
         self._critic = None
         self._citation_injector = None
+        self._semantic_cache = None
     
     def _init_components(self):
         """Inicializa componentes del pipeline."""
@@ -338,6 +343,22 @@ class RAGPipeline:
         
         if self.use_critic:
             self._critic = ResponseCritic(use_llm_critic=False)
+        
+        # Caché semántico
+        if self.use_semantic_cache:
+            try:
+                from ..retrieval.semantic_cache import (
+                    SemanticCache, SemanticCacheConfig
+                )
+                cache_config = SemanticCacheConfig(
+                    similarity_threshold=self.semantic_cache_threshold
+                )
+                cache_dir = self.indices_dir / "semantic_cache"
+                self._semantic_cache = SemanticCache(cache_dir, cache_config)
+                logger.debug("Caché semántico inicializado")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar caché semántico: {e}")
+                self._semantic_cache = None
     
     def ask(
         self,
@@ -366,6 +387,54 @@ class RAGPipeline:
             Tuple (response, sources, routing_decision)
         """
         self._init_components()
+        
+        # 0. Verificar caché semántico
+        if self._semantic_cache and not sources_only and not stream:
+            try:
+                cached, similarity = self._semantic_cache.get(query)
+                if cached:
+                    logger.info(f"💾 Cache semántico HIT (sim={similarity:.3f})")
+                    from ..generation.synthesizer import GeneratedResponse
+                    
+                    # Reconstruir sources desde caché
+                    from ..retrieval.fusion import RetrievalResult
+                    cached_sources = [
+                        RetrievalResult(
+                            chunk_id=s.get("chunk_id", ""),
+                            content=s.get("content", ""),
+                            score=s.get("score", 0.0),
+                            doc_id=s.get("doc_id", ""),
+                            doc_title=s.get("doc_title", ""),
+                            header_path=s.get("header_path", ""),
+                            retriever_type=s.get("retriever_type", "cached")
+                        )
+                        for s in cached.sources
+                    ]
+                    
+                    # Reconstruir routing desde caché
+                    from ..agents.router import RoutingDecision, RetrievalStrategy
+                    cached_routing = RoutingDecision(
+                        query_type=cached.routing_info.get("query_type", "unknown"),
+                        strategy=RetrievalStrategy.HYBRID,
+                        reasoning=f"[CACHED] {cached.routing_info.get('reasoning', '')}",
+                        vector_weight=cached.routing_info.get("vector_weight", 0.5),
+                        bm25_weight=cached.routing_info.get("bm25_weight", 0.3),
+                        graph_weight=cached.routing_info.get("graph_weight", 0.2)
+                    )
+                    
+                    return GeneratedResponse(
+                        content=cached.response,
+                        query=query,
+                        query_type=cached.routing_info.get("query_type", "cached"),
+                        sources_used=[s.get("chunk_id", "") for s in cached.sources],
+                        model=f"{cached.model} (cached)",
+                        tokens_input=0,  # No se consumen tokens
+                        tokens_output=0,
+                        latency_ms=0,
+                        metadata={"semantic_cache_hit": True, "similarity": similarity}
+                    ), cached_sources, cached_routing
+            except Exception as e:
+                logger.debug(f"Error consultando caché semántico: {e}")
         
         # 1. Routing (si habilitado)
         routing = None
@@ -467,6 +536,42 @@ class RAGPipeline:
         if self._critic:
             critique = self._critic.critique(response, sources, query)
             response.metadata["critique"] = critique.to_dict()
+        
+        # 5. Guardar en caché semántico si está habilitado
+        if self._semantic_cache and not response.abstained and not stream:
+            try:
+                # Preparar datos para caché
+                sources_data = [
+                    {
+                        "chunk_id": s.chunk_id,
+                        "content": s.content,
+                        "score": s.score,
+                        "doc_id": s.doc_id,
+                        "doc_title": s.doc_title,
+                        "header_path": s.header_path,
+                        "retriever_type": s.retriever_type
+                    }
+                    for s in sources
+                ]
+                routing_data = {
+                    "query_type": routing.query_type if routing else "unknown",
+                    "reasoning": routing.reasoning if routing else "",
+                    "vector_weight": routing.vector_weight if routing else 0.5,
+                    "bm25_weight": routing.bm25_weight if routing else 0.3,
+                    "graph_weight": routing.graph_weight if routing else 0.2
+                }
+                
+                self._semantic_cache.put(
+                    query=query,
+                    response=response.content,
+                    sources=sources_data,
+                    routing_info=routing_data,
+                    model=response.model,
+                    generation_time=response.latency_ms
+                )
+                logger.info(f"💾 Respuesta guardada en caché semántico")
+            except Exception as e:
+                logger.debug(f"Error guardando en caché semántico: {e}")
         
         return response, sources, routing
     
@@ -945,6 +1050,38 @@ Ejemplos:
     )
     
     parser.add_argument(
+        '--semantic-cache',
+        action='store_true',
+        default=True,
+        help='Activar caché semántico (default: activado). Reutiliza respuestas para queries similares'
+    )
+    
+    parser.add_argument(
+        '--no-semantic-cache',
+        action='store_true',
+        help='Desactivar caché semántico (fuerza generación nueva)'
+    )
+    
+    parser.add_argument(
+        '--cache-threshold',
+        type=float,
+        default=0.92,
+        help='Umbral de similitud para cache semántico (default: 0.92). Valores más altos = más estricto'
+    )
+    
+    parser.add_argument(
+        '--semantic-cache-stats',
+        action='store_true',
+        help='Mostrar estadísticas del caché semántico y salir'
+    )
+    
+    parser.add_argument(
+        '--clear-semantic-cache',
+        action='store_true',
+        help='Limpiar el caché semántico y salir'
+    )
+    
+    parser.add_argument(
         '--costs', '-c',
         action='store_true',
         help='Mostrar resumen de costes acumulados de consultas'
@@ -980,6 +1117,47 @@ Ejemplos:
             cache.close()
         except Exception as e:
             print(f"❌ Error mostrando estadísticas de cache: {e}")
+        sys.exit(0)
+    
+    # Si pide estadísticas del caché semántico
+    if args.semantic_cache_stats and not args.query and not args.interactive:
+        try:
+            paths = setup_paths()
+            from ..retrieval.semantic_cache import SemanticCache
+            cache_dir = paths["indices_dir"] / "semantic_cache"
+            if cache_dir.exists():
+                cache = SemanticCache(cache_dir)
+                stats = cache.get_stats()
+                print("\n💾 Estadísticas del Caché Semántico")
+                print("=" * 45)
+                for key, value in stats.items():
+                    if key == "hit_rate" and value is not None:
+                        print(f"  {key}: {value:.1%}")
+                    else:
+                        print(f"  {key}: {value}")
+                cache.close()
+            else:
+                print("\n💾 Caché semántico no inicializado aún")
+                print("   Se creará con la primera consulta")
+        except Exception as e:
+            print(f"❌ Error mostrando estadísticas: {e}")
+        sys.exit(0)
+    
+    # Si pide limpiar el caché semántico
+    if args.clear_semantic_cache and not args.query and not args.interactive:
+        try:
+            paths = setup_paths()
+            from ..retrieval.semantic_cache import SemanticCache
+            cache_dir = paths["indices_dir"] / "semantic_cache"
+            if cache_dir.exists():
+                cache = SemanticCache(cache_dir)
+                cleared = cache.clear()
+                print(f"\n🗑️ Caché semántico limpiado: {cleared} entradas eliminadas")
+                cache.close()
+            else:
+                print("\n💾 Caché semántico no existe")
+        except Exception as e:
+            print(f"❌ Error limpiando caché: {e}")
         sys.exit(0)
     
     # Si pide listar categorías, mostrar y salir
@@ -1050,6 +1228,9 @@ Ejemplos:
     }
     model = model_map.get(args.model, args.model)
     
+    # Determinar si usar caché semántico
+    use_semantic_cache = not args.no_semantic_cache
+    
     # Crear pipeline
     try:
         pipeline = RAGPipeline(
@@ -1062,7 +1243,9 @@ Ejemplos:
             reranker_preset=args.rerank_preset,
             use_cache=not args.no_cache,
             use_hyde=args.hyde,
-            hyde_domain=args.hyde_domain
+            hyde_domain=args.hyde_domain,
+            use_semantic_cache=use_semantic_cache,
+            semantic_cache_threshold=args.cache_threshold
         )
     except Exception as e:
         logger.error(f"Error inicializando pipeline: {e}")

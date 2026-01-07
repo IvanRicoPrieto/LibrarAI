@@ -11,6 +11,7 @@ from .fusion import HybridFusion, RetrievalResult, UnifiedRetriever
 from .reranker import CrossEncoderReranker, RerankerConfig, RerankerFactory
 from .cache import EmbeddingCache
 from .hyde import HyDEExpander, HyDEConfig, get_hyde_expander
+from .semantic_cache import SemanticCache, SemanticCacheConfig, CachedResponse
 
 __all__ = [
     "VectorRetriever",
@@ -25,5 +26,8 @@ __all__ = [
     "EmbeddingCache",
     "HyDEExpander",
     "HyDEConfig",
-    "get_hyde_expander"
+    "get_hyde_expander",
+    "SemanticCache",
+    "SemanticCacheConfig",
+    "CachedResponse"
 ]

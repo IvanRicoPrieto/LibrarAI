@@ -8,6 +8,7 @@ Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Fí
 - **🎯 Re-ranking**: Cross-Encoder opcional que mejora precisión +15-25%
 - **📝 Evaluación RAGAS**: Pipeline de evaluación con métricas de calidad RAG
 - **💾 Cache de Embeddings**: Reduce costes 70-90% y elimina latencia en queries repetidas
+- **💰 Caché Semántico**: Reutiliza respuestas para queries similares (100% ahorro por hit)
 - **🧠 Chunking Semántico**: Detecta límites naturales (definiciones, teoremas, demostraciones)
 - **📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
 - **📝 Citas precisas**: Referencias `[n]` a fuentes específicas con ubicación
@@ -228,6 +229,38 @@ python -m src.cli.ask_library --interactive
 - **Ejemplo**: "Dame un ejemplo", "¿Puedes ilustrar esto?"
 - **Continuación**: "¿Y después?", "¿Qué más?", "Continúa"
 - **Referencia**: "¿Y si cambio X?", "¿Qué pasa con Y?"
+
+### Caché Semántico
+
+El caché semántico detecta queries semánticamente similares y reutiliza respuestas previas, reduciendo costes de LLM dramáticamente:
+
+```bash
+# Primera consulta (genera respuesta con LLM)
+python -m src.cli.ask_library "¿Qué es el entrelazamiento cuántico?"
+
+# Segunda consulta similar (usa caché, 0 tokens)
+python -m src.cli.ask_library "Explícame el entrelazamiento"
+
+# Ver estadísticas del caché
+python -m src.cli.ask_library --semantic-cache-stats
+
+# Desactivar caché (forzar regeneración)
+python -m src.cli.ask_library "¿Qué es el entrelazamiento?" --no-semantic-cache
+
+# Ajustar umbral de similitud (más estricto)
+python -m src.cli.ask_library "Pregunta" --cache-threshold 0.95
+
+# Limpiar caché
+python -m src.cli.ask_library --clear-semantic-cache
+```
+
+**Características:**
+
+- Usa embeddings OpenAI (text-embedding-3-small) para comparación semántica
+- Umbral configurable (default: 0.92 = 92% similitud)
+- TTL de 7 días por defecto
+- Almacena respuesta + fuentes + routing para reproducibilidad perfecta
+- Cache hit = 0 tokens consumidos (100% ahorro en esa query)
 
 ## 🏗️ Arquitectura
 

@@ -20,20 +20,21 @@ Construir un sistema de Retrieval-Augmented Generation (RAG) agéntico que permi
 
 ### 1.2 Características Clave
 
-| Característica   | Descripción                                                 |
-| ---------------- | ----------------------------------------------------------- |
-| **Integración**  | CLI directa en terminal/VS Code (sin MCP)                   |
-| **Búsqueda**     | Híbrida: semántica (vectores) + léxica (BM25) + grafo       |
-| **Re-ranking**   | Cross-Encoder opcional para +15-25% precisión               |
-| **HyDE**         | Query expansion con documentos hipotéticos (+10-20% recall) |
-| **Evaluación**   | Pipeline RAGAS: faithfulness, relevancy, precision          |
-| **Cache**        | Embeddings cacheados: -70-90% costes, 0ms latencia          |
-| **Filtrado**     | Por categoría/metadata para reducir ruido de dominios       |
-| **Chunking**     | Jerárquico + semántico: detecta definiciones, teoremas, etc |
-| **Citas**        | Rutas de encabezado (ej: `Libro > Cap 3 > Sec 3.2`)         |
-| **Verificación** | Evaluación automática de fidelidad pre-entrega              |
-| **Privacidad**   | Datos 100% locales, solo APIs para LLM de generación        |
-| **Memoria**      | Conversacional: follow-up questions, expansión con contexto |
+| Característica    | Descripción                                                   |
+| ----------------- | ------------------------------------------------------------- |
+| **Integración**   | CLI directa en terminal/VS Code (sin MCP)                     |
+| **Búsqueda**      | Híbrida: semántica (vectores) + léxica (BM25) + grafo         |
+| **Re-ranking**    | Cross-Encoder opcional para +15-25% precisión                 |
+| **HyDE**          | Query expansion con documentos hipotéticos (+10-20% recall)   |
+| **Evaluación**    | Pipeline RAGAS: faithfulness, relevancy, precision            |
+| **Cache Embed.**  | Embeddings cacheados: -70-90% costes, 0ms latencia            |
+| **Cache Sem.**    | Respuestas cacheadas por similitud semántica (100% ahorro/hit)|
+| **Filtrado**      | Por categoría/metadata para reducir ruido de dominios         |
+| **Chunking**      | Jerárquico + semántico: detecta definiciones, teoremas, etc   |
+| **Citas**         | Rutas de encabezado (ej: `Libro > Cap 3 > Sec 3.2`)           |
+| **Verificación**  | Evaluación automática de fidelidad pre-entrega                |
+| **Privacidad**    | Datos 100% locales, solo APIs para LLM de generación          |
+| **Memoria**       | Conversacional: follow-up questions, expansión con contexto   |
 
 ### 1.3 Stack Tecnológico Recomendado
 
@@ -833,7 +834,8 @@ quantum_library_rag/
 │   │   ├── fusion.py          # RRF + Auto-merge
 │   │   ├── reranker.py        # Cross-Encoder re-ranking
 │   │   ├── cache.py           # Cache de embeddings
-│   │   └── hyde.py            # HyDE Query Expansion
+│   │   ├── hyde.py            # HyDE Query Expansion
+│   │   └── semantic_cache.py  # Caché semántico de respuestas
 │   │
 │   ├── generation/
 │   │   ├── prompt_builder.py
