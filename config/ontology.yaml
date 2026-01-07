@@ -578,3 +578,197 @@ extraction_rules:
 
   # Umbral de confianza mínimo para extraer
   min_confidence: 0.7
+# =============================================================================
+# EXTENSIÓN: FINANZAS CUANTITATIVAS Y TRADING
+# =============================================================================
+# Entidades y relaciones para finanzas, trading algorítmico, gestión de riesgo
+# y matemáticas financieras.
+
+finanzas:
+  entities:
+    # Modelos matemáticos financieros
+    ModeloFinanciero:
+      description: "Modelo matemático para valoración o predicción financiera"
+      examples:
+        - "Black-Scholes"
+        - "Heston"
+        - "GARCH"
+        - "Binomial"
+        - "Hull-White"
+        - "Vasicek"
+        - "CIR"
+        - "SABR"
+        - "Local Volatility"
+        - "Jump Diffusion"
+      extraction_patterns:
+        - "modelo de {name}"
+        - "modelo {name}"
+        - "{name} model"
+        - "según el modelo {name}"
+
+    # Medidas de riesgo
+    MedidaRiesgo:
+      description: "Métrica para cuantificar riesgo financiero"
+      examples:
+        - "Value at Risk"
+        - "VaR"
+        - "Conditional VaR"
+        - "CVaR"
+        - "Expected Shortfall"
+        - "Sharpe Ratio"
+        - "Sortino Ratio"
+        - "Maximum Drawdown"
+        - "Beta"
+        - "Volatilidad"
+        - "Greeks"
+        - "Delta"
+        - "Gamma"
+        - "Vega"
+        - "Theta"
+      extraction_patterns:
+        - "{name} del portfolio"
+        - "el {name}"
+        - "calcular {name}"
+        - "{name} es"
+
+    # Instrumentos financieros
+    InstrumentoFinanciero:
+      description: "Activo o derivado financiero"
+      examples:
+        - "Opción"
+        - "Opción Call"
+        - "Opción Put"
+        - "Futuro"
+        - "Forward"
+        - "Swap"
+        - "ETF"
+        - "Bono"
+        - "Treasury"
+        - "T-Bill"
+        - "Acción"
+        - "CDS"
+        - "Warrant"
+        - "Collar"
+        - "Straddle"
+        - "Strangle"
+      extraction_patterns:
+        - "una {name}"
+        - "el {name}"
+        - "{name} sobre"
+        - "precio de la {name}"
+
+    # Estrategias de trading
+    EstrategiaTrading:
+      description: "Estrategia o técnica de trading cuantitativo"
+      examples:
+        - "Mean Reversion"
+        - "Momentum"
+        - "Statistical Arbitrage"
+        - "Pairs Trading"
+        - "Market Making"
+        - "Trend Following"
+        - "Carry Trade"
+        - "Factor Investing"
+        - "Alpha"
+        - "HFT"
+        - "Scalping"
+        - "Swing Trading"
+      extraction_patterns:
+        - "estrategia de {name}"
+        - "estrategia {name}"
+        - "{name} strategy"
+        - "trading {name}"
+
+    # Conceptos estocásticos
+    ConceptoEstocastico:
+      description: "Proceso o concepto de cálculo estocástico"
+      examples:
+        - "Movimiento Browniano"
+        - "Proceso de Wiener"
+        - "Proceso de Poisson"
+        - "Martingala"
+        - "Lema de Itô"
+        - "Ecuación de Fokker-Planck"
+        - "Path Integral"
+        - "Drift"
+        - "Difusión"
+        - "Volatilidad Estocástica"
+        - "Salto"
+        - "Stopping Time"
+      extraction_patterns:
+        - "proceso de {name}"
+        - "{name} process"
+        - "el {name}"
+        - "ecuación de {name}"
+
+    # Conceptos de microestructura
+    ConceptoMicroestructura:
+      description: "Concepto de microestructura de mercados"
+      examples:
+        - "Order Book"
+        - "Limit Order"
+        - "Market Order"
+        - "Bid-Ask Spread"
+        - "Slippage"
+        - "Market Impact"
+        - "Latencia"
+        - "Liquidez"
+        - "Depth"
+        - "VWAP"
+        - "TWAP"
+        - "Execution"
+      extraction_patterns:
+        - "el {name}"
+        - "{name} del mercado"
+        - "análisis de {name}"
+
+    # Técnicas de Machine Learning en finanzas
+    TecnicaMLFinanzas:
+      description: "Técnica de ML aplicada a finanzas"
+      examples:
+        - "Feature Engineering"
+        - "Backtesting"
+        - "Cross-Validation"
+        - "Walk-Forward"
+        - "Purged K-Fold"
+        - "Meta-Labeling"
+        - "Triple Barrier"
+        - "Fractional Differentiation"
+        - "Combinatorial Purged CV"
+      extraction_patterns:
+        - "técnica de {name}"
+        - "{name} para"
+        - "método de {name}"
+        - "usando {name}"
+
+  relations:
+    # Relaciones específicas de finanzas
+    patterns:
+      valora:
+        - "{A} valora {B}"
+        - "{A} pricing de {B}"
+        - "precio de {B} según {A}"
+      cubre:
+        - "{A} cubre {B}"
+        - "hedging de {B} con {A}"
+        - "{A} para cobertura de {B}"
+      mide:
+        - "{A} mide {B}"
+        - "{A} cuantifica {B}"
+        - "{B} medido por {A}"
+      modela:
+        - "{A} modela {B}"
+        - "{A} describe {B}"
+        - "{B} según {A}"
+      opera_en:
+        - "{A} opera en {B}"
+        - "{A} se ejecuta en {B}"
+        - "trading de {A} en {B}"
+      optimiza:
+        - "{A} optimiza {B}"
+        - "optimización de {B} con {A}"
+        - "maximizar {B} usando {A}"
+      predice:
+        - "{A} predice {B}"
+        - "{A} forecast de {B}"
+        - "predicción de {B} con {A}"

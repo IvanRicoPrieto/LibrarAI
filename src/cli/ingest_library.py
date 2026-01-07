@@ -55,7 +55,7 @@ def print_banner():
     banner = """
 ╔═══════════════════════════════════════════════════════════╗
 ║        � LibrarAI - Library Indexer                       ║
-║        Indexación de tu biblioteca inteligente             ║
+║        Indexación de tu biblioteca inteligente            ║
 ╚═══════════════════════════════════════════════════════════╝
 """
     print(banner)

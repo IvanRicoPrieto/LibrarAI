@@ -138,7 +138,7 @@ def print_banner():
     banner = """
 ╔═══════════════════════════════════════════════════════════╗
 ║        � LibrarAI - Ask Library                           ║
-║        Tu biblioteca inteligente con IA                    ║
+║        Tu biblioteca inteligente con IA                   ║
 ╚═══════════════════════════════════════════════════════════╝
 """
     print(banner)
