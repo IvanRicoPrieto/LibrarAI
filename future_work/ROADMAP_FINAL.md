@@ -82,13 +82,13 @@ Este sistema será consumido por un **agente de GitHub Copilot** desde VS Code p
 
 ## 🟢 TIER 4: Mejoras de Robustez y Mantenibilidad
 
-|  #  | Línea de Trabajo                         | Impacto en Precisión | Mejora que Ofrece                                                                                      | Complejidad | Archivos Afectados                 |    Estado     |
-| :-: | :--------------------------------------- | :------------------- | :----------------------------------------------------------------------------------------------------- | :---------: | :--------------------------------- | :-----------: |
-| 16  | **Tests Unitarios y de Integración**     | 🎯🎯                 | No hay tests. Impide refactoring seguro. Necesario para evolución sostenible.                          |   ⭐⭐⭐    | Nuevo `tests/`                     | ✅ Completado |
-| 17  | **Dockerización Completa**               | 🎯🎯                 | `docker-compose` con RAG + Qdrant. Reproducibilidad total.                                             |    ⭐⭐     | `docker-compose.yml`, `Dockerfile` |               |
-| 18  | **Logging Estructurado (OpenTelemetry)** | 🎯                   | Tracing para debugging. Útil cuando el agente reporta respuestas pobres y hay que diagnosticar.        |    ⭐⭐     | Todos los módulos                  |               |
-| 19  | **Ampliar Whitelist del Sandbox**        | 🎯                   | Faltan: `networkx`, `scikit-learn`, `pennylane`, `cirq`. Limita cálculos que el agente puede ejecutar. |     ⭐      | `sandbox.py`                       |               |
-| 20  | **Validación de Código con AST**         | 🎯                   | Análisis estático del código generado. Detecta bucles infinitos potenciales antes de ejecutar.         |    ⭐⭐     | `sandbox.py`                       |               |
+|  #  | Línea de Trabajo                     | Impacto en Precisión | Mejora que Ofrece                                                                                      | Complejidad | Archivos Afectados                 |    Estado     |
+| :-: | :----------------------------------- | :------------------- | :----------------------------------------------------------------------------------------------------- | :---------: | :--------------------------------- | :-----------: |
+| 16  | **Tests Unitarios y de Integración** | 🎯🎯                 | No hay tests. Impide refactoring seguro. Necesario para evolución sostenible.                          |   ⭐⭐⭐    | Nuevo `tests/`                     | ✅ Completado |
+| 17  | **Dockerización Completa**           | 🎯🎯                 | `docker-compose` con RAG + Qdrant + Sandbox. Reproducibilidad total.                                   |    ⭐⭐     | `docker-compose.yml`, `Dockerfile` | ✅ Completado |
+| 18  | **Logging Estructurado (structlog)** | 🎯                   | Tracing para debugging. Útil cuando el agente reporta respuestas pobres y hay que diagnosticar.        |    ⭐⭐     | `src/utils/logging_config.py`      | ✅ Completado |
+| 19  | **Ampliar Whitelist del Sandbox**    | 🎯                   | Faltan: `networkx`, `scikit-learn`, `pennylane`, `cirq`. Limita cálculos que el agente puede ejecutar. |     ⭐      | `sandbox.py`                       | ✅ Completado |
+| 20  | **Validación de Código con AST**     | 🎯                   | Análisis estático del código generado. Detecta bucles infinitos potenciales antes de ejecutar.         |    ⭐⭐     | `sandbox.py`                       | ✅ Completado |
 
 ---
 

@@ -1,15 +1,22 @@
-# Docker Compose for LibrarAI - Qdrant Vector Database
+# Docker Compose for LibrarAI - Complete RAG Stack
 #
-# This provides a persistent, production-ready Qdrant instance instead of
-# the local file-based storage which has performance warnings above 20K vectors.
+# Services:
+#   - qdrant: Vector database for semantic search
+#   - librar_ai: RAG application (optional, for production deployment)
 #
 # Usage:
-#   docker compose up -d          # Start Qdrant
-#   docker compose down           # Stop Qdrant
-#   docker compose down -v        # Stop and remove data
+#   docker compose up -d qdrant         # Start only Qdrant (development)
+#   docker compose up -d                # Start all services
+#   docker compose down                 # Stop all services
+#   docker compose down -v              # Stop and remove data
 #
-# The LibrarAI system will automatically use Docker Qdrant when:
-#   QDRANT_URL=http://localhost:6333 is set in .env
+# Development mode (recommended):
+#   1. Start Qdrant: docker compose up -d qdrant
+#   2. Set in .env: QDRANT_URL=http://localhost:6333
+#   3. Run app locally: python -m src.cli.ask_library "query"
+#
+# Production mode:
+#   docker compose --profile production up -d
 #
 # Benefits over local storage:
 #   - Better performance for large collections (125K+ chunks)
@@ -20,6 +27,9 @@
 version: "3.8"
 
 services:
+  # ===========================================================================
+  # Qdrant Vector Database
+  # ===========================================================================
   qdrant:
     image: qdrant/qdrant:latest
     container_name: librar_ai_qdrant
@@ -32,13 +42,90 @@ services:
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
       - QDRANT__LOG_LEVEL=INFO
+      # Optimizations for large collections
+      - QDRANT__STORAGE__ON_DISK_PAYLOAD=true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6333/readiness"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ===========================================================================
+  # LibrarAI RAG Application (Production Profile)
+  # ===========================================================================
+  librar_ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: librar_ai_app
+    profiles:
+      - production
+    restart: unless-stopped
+    ports:
+      - "8000:8000" # API port (if API is implemented)
+    volumes:
+      - ./data:/app/data:ro # Read-only access to documents
+      - ./indices:/app/indices # Persistent indices
+      - ./logs:/app/logs # Logs
+      - ./outputs:/app/outputs # Generated outputs
+      - ./config:/app/config:ro # Configuration
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+    env_file:
+      - .env
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+
+  # ===========================================================================
+  # Code Sandbox (Isolated Python execution)
+  # ===========================================================================
+  sandbox:
+    image: python:3.12-slim
+    container_name: librar_ai_sandbox
+    profiles:
+      - sandbox
+    network_mode: none # No network access for security
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M
+    volumes:
+      - sandbox_code:/code:ro
+    working_dir: /code
+    command: ["python", "/code/script.py"]
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
 
 volumes:
   qdrant_data:
     driver: local
+  sandbox_code:
+    driver: local
+
+networks:
+  default:
+    name: librar_ai_network

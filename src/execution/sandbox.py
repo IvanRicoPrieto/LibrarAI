@@ -7,6 +7,13 @@ para cálculos, gráficas y simulaciones cuánticas.
 Modos de ejecución:
 1. Subprocess con restricciones (por defecto, sin Docker)
 2. Docker container (máxima seguridad, requiere Docker)
+
+Características de seguridad:
+- Whitelist de imports
+- Validación AST para detectar patrones peligrosos
+- Análisis de bucles infinitos potenciales
+- Timeout para evitar ejecución indefinida
+- Sin acceso a red ni filesystem
 """
 
 import subprocess
@@ -15,9 +22,10 @@ import os
 import sys
 import signal
 import base64
+import ast
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set, Tuple
 from datetime import datetime
 import logging
 import re
@@ -40,6 +48,18 @@ ALLOWED_IMPORTS = {
     
     # Computación cuántica
     "qutip",
+    "pennylane", "qml",  # PennyLane para QML
+    "cirq",              # Google Cirq
+    
+    # Machine Learning (científico)
+    "sklearn", "scikit-learn",
+    "sklearn.decomposition",
+    "sklearn.cluster",
+    "sklearn.metrics",
+    "sklearn.preprocessing",
+    
+    # Grafos
+    "networkx", "nx",
     
     # Datos
     "pandas", "pd",
@@ -54,6 +74,8 @@ ALLOWED_IMPORTS = {
     "re",
     "random",
     "statistics",
+    "fractions",
+    "decimal",
 }
 
 # Imports bloqueados (peligrosos)
@@ -79,6 +101,210 @@ BLOCKED_IMPORTS = {
     "pathlib",
     "glob",
 }
+
+
+# =============================================================================
+# Validación AST (Análisis Estático de Código)
+# =============================================================================
+
+class ASTSecurityVisitor(ast.NodeVisitor):
+    """
+    Visitador AST para detectar patrones de código peligrosos.
+    
+    Detecta:
+    - Bucles potencialmente infinitos (while True sin break claro)
+    - Llamadas a funciones peligrosas
+    - Acceso a atributos sensibles (__class__, __bases__, etc.)
+    - Recursión sin límite aparente
+    """
+    
+    # Atributos peligrosos que permiten escapar del sandbox
+    DANGEROUS_ATTRS = {
+        "__class__", "__bases__", "__subclasses__", "__mro__",
+        "__globals__", "__code__", "__builtins__", "__import__",
+        "__getattribute__", "__setattr__", "__delattr__",
+        "func_globals", "gi_frame", "f_locals", "f_globals",
+    }
+    
+    # Funciones built-in peligrosas
+    DANGEROUS_BUILTINS = {
+        "eval", "exec", "compile", "__import__", "open",
+        "getattr", "setattr", "delattr", "globals", "locals",
+        "vars", "dir", "type", "object",
+    }
+    
+    def __init__(self):
+        self.issues: List[Dict[str, Any]] = []
+        self.function_calls: Set[str] = set()
+        self.while_loops_without_break = 0
+        self.recursion_candidates: Set[str] = set()
+        self.current_function: Optional[str] = None
+        self.max_loop_depth = 0
+        self.current_loop_depth = 0
+    
+    def add_issue(self, severity: str, message: str, node: ast.AST):
+        """Registra un problema de seguridad."""
+        self.issues.append({
+            "severity": severity,  # "error", "warning", "info"
+            "message": message,
+            "line": getattr(node, "lineno", 0),
+            "col": getattr(node, "col_offset", 0),
+        })
+    
+    def visit_Import(self, node: ast.Import):
+        """Verifica imports directos."""
+        for alias in node.names:
+            module = alias.name.split('.')[0]
+            if module in BLOCKED_IMPORTS:
+                self.add_issue("error", f"Import bloqueado: {alias.name}", node)
+        self.generic_visit(node)
+    
+    def visit_ImportFrom(self, node: ast.ImportFrom):
+        """Verifica imports from ... import ..."""
+        if node.module:
+            module = node.module.split('.')[0]
+            if module in BLOCKED_IMPORTS:
+                self.add_issue("error", f"Import bloqueado: from {node.module}", node)
+        self.generic_visit(node)
+    
+    def visit_Call(self, node: ast.Call):
+        """Analiza llamadas a funciones."""
+        func_name = None
+        
+        if isinstance(node.func, ast.Name):
+            func_name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            func_name = node.func.attr
+        
+        if func_name:
+            self.function_calls.add(func_name)
+            
+            # Detectar funciones peligrosas
+            if func_name in self.DANGEROUS_BUILTINS:
+                self.add_issue("error", f"Función peligrosa: {func_name}()", node)
+            
+            # Detectar posible recursión
+            if self.current_function and func_name == self.current_function:
+                self.recursion_candidates.add(func_name)
+                self.add_issue("warning", f"Posible recursión: {func_name}() se llama a sí misma", node)
+        
+        self.generic_visit(node)
+    
+    def visit_Attribute(self, node: ast.Attribute):
+        """Detecta acceso a atributos peligrosos."""
+        if node.attr in self.DANGEROUS_ATTRS:
+            self.add_issue("error", f"Acceso a atributo peligroso: {node.attr}", node)
+        self.generic_visit(node)
+    
+    def visit_While(self, node: ast.While):
+        """Analiza bucles while para detectar posibles infinitos."""
+        self.current_loop_depth += 1
+        self.max_loop_depth = max(self.max_loop_depth, self.current_loop_depth)
+        
+        # Detectar while True o while 1
+        is_infinite_pattern = False
+        if isinstance(node.test, ast.Constant):
+            if node.test.value in (True, 1):
+                is_infinite_pattern = True
+        elif isinstance(node.test, ast.NameConstant):  # Python < 3.8
+            if node.test.value is True:
+                is_infinite_pattern = True
+        
+        if is_infinite_pattern:
+            # Buscar break en el cuerpo
+            has_break = self._contains_break(node.body)
+            if not has_break:
+                self.while_loops_without_break += 1
+                self.add_issue("warning", "Bucle 'while True' sin 'break' detectado - posible bucle infinito", node)
+        
+        self.generic_visit(node)
+        self.current_loop_depth -= 1
+    
+    def visit_For(self, node: ast.For):
+        """Analiza bucles for para detectar profundidad excesiva."""
+        self.current_loop_depth += 1
+        self.max_loop_depth = max(self.max_loop_depth, self.current_loop_depth)
+        
+        if self.current_loop_depth > 4:
+            self.add_issue("warning", f"Bucles anidados profundos (nivel {self.current_loop_depth})", node)
+        
+        self.generic_visit(node)
+        self.current_loop_depth -= 1
+    
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        """Rastrea definiciones de función para detectar recursión."""
+        old_function = self.current_function
+        self.current_function = node.name
+        self.generic_visit(node)
+        self.current_function = old_function
+    
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
+        """Rastrea funciones async."""
+        old_function = self.current_function
+        self.current_function = node.name
+        self.generic_visit(node)
+        self.current_function = old_function
+    
+    def _contains_break(self, body: List[ast.stmt]) -> bool:
+        """Verifica si un cuerpo de código contiene un break."""
+        for stmt in body:
+            if isinstance(stmt, ast.Break):
+                return True
+            if isinstance(stmt, ast.If):
+                if self._contains_break(stmt.body) or self._contains_break(stmt.orelse):
+                    return True
+            if isinstance(stmt, ast.Try):
+                for handler in stmt.handlers:
+                    if self._contains_break(handler.body):
+                        return True
+        return False
+    
+    def get_summary(self) -> Dict[str, Any]:
+        """Retorna resumen del análisis."""
+        errors = [i for i in self.issues if i["severity"] == "error"]
+        warnings = [i for i in self.issues if i["severity"] == "warning"]
+        
+        return {
+            "safe": len(errors) == 0,
+            "errors": len(errors),
+            "warnings": len(warnings),
+            "issues": self.issues,
+            "max_loop_depth": self.max_loop_depth,
+            "potential_infinite_loops": self.while_loops_without_break,
+            "recursion_candidates": list(self.recursion_candidates),
+        }
+
+
+def analyze_code_ast(code: str) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Analiza código Python usando AST para detectar problemas de seguridad.
+    
+    Args:
+        code: Código Python a analizar
+    
+    Returns:
+        (es_seguro, reporte_detallado)
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return False, {
+            "safe": False,
+            "errors": 1,
+            "warnings": 0,
+            "issues": [{
+                "severity": "error",
+                "message": f"Error de sintaxis: {e.msg}",
+                "line": e.lineno or 0,
+                "col": e.offset or 0,
+            }],
+            "syntax_error": str(e),
+        }
+    
+    visitor = ASTSecurityVisitor()
+    visitor.visit(tree)
+    
+    return visitor.get_summary()["safe"], visitor.get_summary()
 
 
 @dataclass
@@ -162,9 +388,15 @@ class CodeSandbox:
         """
         Valida que el código no use imports peligrosos.
         
+        Realiza dos niveles de validación:
+        1. Análisis regex rápido (patrones obvios)
+        2. Análisis AST completo (detección profunda)
+        
         Returns:
             (es_valido, mensaje_error)
         """
+        # === Nivel 1: Validación regex rápida ===
+        
         # Buscar imports
         import_pattern = re.compile(
             r'^\s*(?:from\s+(\S+)\s+import|import\s+(\S+))',
@@ -192,6 +424,26 @@ class CodeSandbox:
         for pattern, name in dangerous_patterns:
             if re.search(pattern, code):
                 return False, f"Operación bloqueada: {name} (seguridad)"
+        
+        # === Nivel 2: Análisis AST profundo ===
+        is_safe, report = analyze_code_ast(code)
+        
+        if not is_safe:
+            # Construir mensaje de error detallado
+            errors = [i for i in report.get("issues", []) if i["severity"] == "error"]
+            if errors:
+                error = errors[0]
+                return False, f"[Línea {error['line']}] {error['message']}"
+            
+            # Si hay syntax error
+            if "syntax_error" in report:
+                return False, f"Error de sintaxis: {report['syntax_error']}"
+        
+        # Advertencias (no bloquean pero se loguean)
+        warnings = [i for i in report.get("issues", []) if i["severity"] == "warning"]
+        if warnings:
+            for w in warnings:
+                logger.warning(f"Sandbox warning [Línea {w['line']}]: {w['message']}")
         
         return True, ""
     
