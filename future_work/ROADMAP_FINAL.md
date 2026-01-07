@@ -75,20 +75,20 @@ Este sistema será consumido por un **agente de GitHub Copilot** desde VS Code p
 | 11  | **API REST con FastAPI**               | 🎯🎯🎯               | Desacopla lógica del CLI. Permite que el agente Copilot consuma LibrarAI via HTTP en lugar de shell. Más limpio, mejor manejo de errores, tipado de respuestas. |   ⭐⭐⭐    | Nuevo `src/api/`                    |  ⏭️ Omitido (CLI)   |
 | 12  | **Caché Semántica (GPTCache)**         | 🎯🎯🎯               | Si una query es semánticamente equivalente a una anterior (no idéntica), devuelve respuesta cacheada. Reduce costes LLM dramáticamente.                         |   ⭐⭐⭐    | Nuevo `semantic_cache.py`           |    ✅ Completado    |
 | 13  | **Indexación Paralela**                | 🎯🎯                 | Actualmente secuencial. Paralelizar embeddings acelera 3-5x. Importante para reindexaciones tras añadir libros.                                                 |   ⭐⭐⭐    | `indexer.py`                        |    ✅ Completado    |
-| 14  | **Compresión de Contexto (LLMLingua)** | 🎯🎯                 | Comprime chunks antes de enviar al LLM. Reduce tokens 50-70%. Permite más contexto en el mismo presupuesto de tokens.                                           |   ⭐⭐⭐    | `prompt_builder.py`                 |   ✅ Completado    |
+| 14  | **Compresión de Contexto (LLMLingua)** | 🎯🎯                 | Comprime chunks antes de enviar al LLM. Reduce tokens 50-70%. Permite más contexto en el mismo presupuesto de tokens.                                           |   ⭐⭐⭐    | `prompt_builder.py`                 |    ✅ Completado    |
 | 15  | **Embeddings Locales con GPU**         | 🎯🎯                 | Elimina dependencia de API OpenAI para embeddings. BGE-M3 o E5-mistral-7b dan calidad comparable. Reduce costes a cero.                                         |   ⭐⭐⭐    | `indexer.py`, `vector_retriever.py` | ⏭️ Omitido (OpenAI) |
 
 ---
 
 ## 🟢 TIER 4: Mejoras de Robustez y Mantenibilidad
 
-|  #  | Línea de Trabajo                         | Impacto en Precisión | Mejora que Ofrece                                                                                      | Complejidad | Archivos Afectados                 |
-| :-: | :--------------------------------------- | :------------------- | :----------------------------------------------------------------------------------------------------- | :---------: | :--------------------------------- |
-| 16  | **Tests Unitarios y de Integración**     | 🎯🎯                 | No hay tests. Impide refactoring seguro. Necesario para evolución sostenible.                          |   ⭐⭐⭐    | Nuevo `tests/`                     |
-| 17  | **Dockerización Completa**               | 🎯🎯                 | `docker-compose` con RAG + Qdrant. Reproducibilidad total.                                             |    ⭐⭐     | `docker-compose.yml`, `Dockerfile` |
-| 18  | **Logging Estructurado (OpenTelemetry)** | 🎯                   | Tracing para debugging. Útil cuando el agente reporta respuestas pobres y hay que diagnosticar.        |    ⭐⭐     | Todos los módulos                  |
-| 19  | **Ampliar Whitelist del Sandbox**        | 🎯                   | Faltan: `networkx`, `scikit-learn`, `pennylane`, `cirq`. Limita cálculos que el agente puede ejecutar. |     ⭐      | `sandbox.py`                       |
-| 20  | **Validación de Código con AST**         | 🎯                   | Análisis estático del código generado. Detecta bucles infinitos potenciales antes de ejecutar.         |    ⭐⭐     | `sandbox.py`                       |
+|  #  | Línea de Trabajo                         | Impacto en Precisión | Mejora que Ofrece                                                                                      | Complejidad | Archivos Afectados                 |    Estado     |
+| :-: | :--------------------------------------- | :------------------- | :----------------------------------------------------------------------------------------------------- | :---------: | :--------------------------------- | :-----------: |
+| 16  | **Tests Unitarios y de Integración**     | 🎯🎯                 | No hay tests. Impide refactoring seguro. Necesario para evolución sostenible.                          |   ⭐⭐⭐    | Nuevo `tests/`                     | ✅ Completado |
+| 17  | **Dockerización Completa**               | 🎯🎯                 | `docker-compose` con RAG + Qdrant. Reproducibilidad total.                                             |    ⭐⭐     | `docker-compose.yml`, `Dockerfile` |               |
+| 18  | **Logging Estructurado (OpenTelemetry)** | 🎯                   | Tracing para debugging. Útil cuando el agente reporta respuestas pobres y hay que diagnosticar.        |    ⭐⭐     | Todos los módulos                  |               |
+| 19  | **Ampliar Whitelist del Sandbox**        | 🎯                   | Faltan: `networkx`, `scikit-learn`, `pennylane`, `cirq`. Limita cálculos que el agente puede ejecutar. |     ⭐      | `sandbox.py`                       |               |
+| 20  | **Validación de Código con AST**         | 🎯                   | Análisis estático del código generado. Detecta bucles infinitos potenciales antes de ejecutar.         |    ⭐⭐     | `sandbox.py`                       |               |
 
 ---
 

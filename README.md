@@ -299,6 +299,40 @@ python -m src.cli.ask_library "Estado del arte en computación cuántica" --comp
 - Marcadores de cita `[n]`
 - Palabras clave técnicas (qubit, entanglement, etc.)
 
+### 🧪 Tests
+
+Suite de tests con pytest para validación de componentes:
+
+```bash
+# Ejecutar todos los tests
+pytest tests/ -v
+
+# Tests específicos por componente
+pytest tests/test_compressor.py -v    # Compresión de contexto
+pytest tests/test_fusion.py -v        # Fusión RRF
+pytest tests/test_cache.py -v         # Cache de embeddings
+pytest tests/test_chunker.py -v       # Chunking jerárquico
+
+# Tests de integración
+pytest tests/test_integration.py -v
+
+# Con cobertura
+pytest tests/ --cov=src --cov-report=html
+
+# Solo tests unitarios (excluir integración)
+pytest tests/ -v -m "not integration"
+```
+
+**Estructura de tests:**
+
+| Archivo             | Componente          | Tests |
+| ------------------- | ------------------- | ----- |
+| test_compressor.py  | Compresión contexto | 21    |
+| test_fusion.py      | Fusión RRF          | 16    |
+| test_cache.py       | Cache embeddings    | 16    |
+| test_chunker.py     | Chunking jerárquico | 11    |
+| test_integration.py | Pipeline end-to-end | 10    |
+
 ## 🏗️ Arquitectura
 
 ```
