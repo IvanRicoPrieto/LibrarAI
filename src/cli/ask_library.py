@@ -1166,6 +1166,15 @@ Ejemplos:
     
     args = parser.parse_args()
     
+    # Cargar variables de entorno ANTES de cualquier operación
+    try:
+        from dotenv import load_dotenv
+        env_path = Path(__file__).parent.parent.parent / '.env'
+        if env_path.exists():
+            load_dotenv(env_path)
+    except ImportError:
+        pass
+    
     # Configurar logging
     if args.verbose:
         logging.getLogger().setLevel(logging.INFO)
@@ -1242,7 +1251,14 @@ Ejemplos:
         try:
             paths = setup_paths()
             from qdrant_client import QdrantClient
-            client = QdrantClient(path=str(paths["indices_dir"] / "qdrant"))
+            import os
+            
+            # Usar QDRANT_URL si está definido (Docker), sino local
+            qdrant_url = os.getenv("QDRANT_URL")
+            if qdrant_url:
+                client = QdrantClient(url=qdrant_url)
+            else:
+                client = QdrantClient(path=str(paths["indices_dir"] / "qdrant"))
             
             # Obtener categorías únicas haciendo scroll
             categories = set()
@@ -1274,15 +1290,6 @@ Ejemplos:
     if not args.query and not args.interactive:
         parser.print_help()
         sys.exit(1)
-    
-    # Cargar variables de entorno
-    try:
-        from dotenv import load_dotenv
-        env_path = Path(__file__).parent.parent.parent / '.env'
-        if env_path.exists():
-            load_dotenv(env_path)
-    except ImportError:
-        pass
     
     # Configurar rutas
     paths = setup_paths()

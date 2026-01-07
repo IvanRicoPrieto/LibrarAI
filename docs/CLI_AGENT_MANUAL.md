@@ -8,13 +8,86 @@ Este documento describe cómo un agente de IA debe interactuar con el sistema Li
 
 ## 📍 Información del Sistema
 
-| Propiedad                    | Valor                                       |
-| ---------------------------- | ------------------------------------------- |
-| **Directorio raíz**          | `/home/ivan/Computación Cuántica/LibrarAI/` |
-| **Python requerido**         | 3.10+                                       |
-| **Entorno virtual**          | `.venv` (OBLIGATORIO activar antes de usar) |
-| **Archivo de configuración** | `config/settings.yaml`                      |
-| **Archivo de costes**        | `logs/cost_tracking.csv`                    |
+| Propiedad                    | Valor                                        |
+| ---------------------------- | -------------------------------------------- |
+| **Directorio raíz**          | `/home/ivan/Computación Cuántica/LibrarAI/`  |
+| **Python requerido**         | 3.10+                                        |
+| **Entorno virtual**          | `.venv` (OBLIGATORIO activar antes de usar)  |
+| **Archivo de configuración** | `config/settings.yaml`                       |
+| **Archivo de costes**        | `logs/cost_tracking.csv`                     |
+| **Qdrant Docker**            | `http://localhost:6333` (ver sección Docker) |
+
+---
+
+## 🐳 Docker (Qdrant)
+
+El sistema usa **Qdrant** como base de datos vectorial, desplegado en Docker para mejor rendimiento con grandes colecciones.
+
+### Estado del Contenedor
+
+Verificar que Qdrant está corriendo:
+
+```bash
+docker ps | grep qdrant
+```
+
+Iniciar Qdrant si no está corriendo:
+
+```bash
+cd "/home/ivan/Computación Cuántica/LibrarAI" && docker compose up -d
+```
+
+Ver logs de Qdrant:
+
+```bash
+docker logs librariai-qdrant --tail 20
+```
+
+### Configuración de Conexión
+
+La URL de Qdrant se configura en `.env`:
+
+```env
+QDRANT_URL=http://localhost:6333
+```
+
+La CLI carga automáticamente esta variable. **NO es necesario pasarla manualmente.**
+
+### Verificar Conexión
+
+```bash
+curl http://localhost:6333/collections
+```
+
+### Estadísticas de la Colección
+
+```bash
+curl http://localhost:6333/collections/quantum_library | jq '.result.points_count'
+```
+
+### Persistencia de Datos
+
+Los datos de Qdrant se persisten en `indices/qdrant/` mediante un bind mount:
+
+```yaml
+# docker-compose.yml
+volumes:
+  - ./indices/qdrant:/qdrant/storage
+```
+
+### Reiniciar Qdrant (sin perder datos)
+
+```bash
+cd "/home/ivan/Computación Cuántica/LibrarAI" && docker compose restart qdrant
+```
+
+### Troubleshooting Docker
+
+Si ves el error "Local mode is not recommended":
+
+1. Verifica que Docker está corriendo: `docker ps`
+2. Verifica que `.env` tiene `QDRANT_URL=http://localhost:6333`
+3. Reinicia el contenedor: `docker compose up -d`
 
 ---
 
