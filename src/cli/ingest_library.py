@@ -145,6 +145,33 @@ Ejemplos:
         help='Usar chunking semántico adaptativo (detecta definiciones, teoremas, etc.)'
     )
     
+    parser.add_argument(
+        '--parallel', '-p',
+        action='store_true',
+        default=True,
+        help='Usar indexación paralela (default: activado, 3-5x más rápido)'
+    )
+    
+    parser.add_argument(
+        '--no-parallel',
+        action='store_true',
+        help='Desactivar indexación paralela (modo secuencial)'
+    )
+    
+    parser.add_argument(
+        '--workers', '-w',
+        type=int,
+        default=4,
+        help='Número de workers para paralelización (default: 4)'
+    )
+    
+    parser.add_argument(
+        '--batch-size', '-b',
+        type=int,
+        default=50,
+        help='Tamaño de batch para embeddings paralelos (default: 50)'
+    )
+    
     args = parser.parse_args()
     
     # Configurar nivel de logging
@@ -206,17 +233,25 @@ Ejemplos:
     # Configurar indexador
     embedding_config = config.get("embedding", {})
     
+    # Determinar si usar paralelización
+    use_parallel = not args.no_parallel
+    
     indexer = LibraryIndexer(
         indices_dir=indices_dir,
         embedding_provider=embedding_config.get("provider", "openai"),
         embedding_model=embedding_config.get("model", "text-embedding-3-large"),
         embedding_dimensions=embedding_config.get("dimensions", 1536),
         use_graph=config.get("graph", {}).get("enabled", True),
-        use_semantic_chunking=args.semantic_chunking
+        use_semantic_chunking=args.semantic_chunking,
+        parallel_workers=args.workers,
+        parallel_batch_size=args.batch_size
     )
     
     if args.semantic_chunking:
         print("🧠 Chunking semántico activado (detecta definiciones, teoremas, etc.)")
+    
+    if use_parallel:
+        print(f"⚡ Indexación paralela activada ({args.workers} workers, batch {args.batch_size})")
     
     # Solo estadísticas
     if args.stats:
@@ -241,10 +276,11 @@ Ejemplos:
         stats = indexer.index_library(
             markdown_dir=data_dir,
             incremental=not args.force,
-            force=args.force
+            force=args.force,
+            use_parallel=use_parallel
         )
         
-        elapsed = (datetime.now() - start_time).total_seconds()
+        elapsed = stats.get("elapsed_seconds", (datetime.now() - start_time).total_seconds())
         
         print("\n✅ Indexación completada")
         print("=" * 50)

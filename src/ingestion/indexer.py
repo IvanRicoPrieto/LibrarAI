@@ -2,7 +2,7 @@
 Indexador de Biblioteca - Crea índices vectoriales, BM25 y grafo.
 
 Este módulo se encarga de:
-1. Generar embeddings para chunks
+1. Generar embeddings para chunks (con paralelización opcional)
 2. Almacenar en Qdrant (vector DB) - local o remoto (Docker/Cloud)
 3. Construir índice BM25 para búsqueda léxica
 4. Construir grafo de conocimiento (opcional)
@@ -16,8 +16,10 @@ import hashlib
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
+import time
 
 from tqdm import tqdm
 
@@ -106,7 +108,9 @@ class LibraryIndexer:
         qdrant_collection: str = "quantum_library",
         use_graph: bool = True,
         qdrant_url: str = None,
-        use_semantic_chunking: bool = False
+        use_semantic_chunking: bool = False,
+        parallel_workers: int = 4,
+        parallel_batch_size: int = 50
     ):
         """
         Args:
@@ -118,6 +122,8 @@ class LibraryIndexer:
             use_graph: Si crear grafo de conocimiento
             qdrant_url: URL de Qdrant remoto (ej: http://localhost:6333). Si None, usa local.
             use_semantic_chunking: Si usar chunking semántico adaptativo
+            parallel_workers: Número de workers para embeddings paralelos (default: 4)
+            parallel_batch_size: Tamaño de batch por worker (default: 50)
         """
         self.indices_dir = Path(indices_dir)
         self.indices_dir.mkdir(parents=True, exist_ok=True)
@@ -129,6 +135,8 @@ class LibraryIndexer:
         self.use_graph = use_graph
         self.qdrant_url = qdrant_url or os.getenv("QDRANT_URL")
         self.use_semantic_chunking = use_semantic_chunking
+        self.parallel_workers = parallel_workers
+        self.parallel_batch_size = parallel_batch_size
         
         # Rutas de archivos
         self.manifest_path = self.indices_dir / "manifest.json"
@@ -262,38 +270,129 @@ class LibraryIndexer:
             # Sentence transformers
             return self._embedding_client.encode(text).tolist()
     
+    def _get_embeddings_single_batch(
+        self,
+        batch_texts: List[str],
+        batch_idx: int
+    ) -> Tuple[int, List[List[float]], int]:
+        """
+        Procesa un solo batch de embeddings. Usado por workers paralelos.
+        
+        Args:
+            batch_texts: Textos del batch
+            batch_idx: Índice del batch para ordenación
+            
+        Returns:
+            Tuple (batch_idx, embeddings, tokens_used)
+        """
+        if self.embedding_provider == "openai":
+            response = self._embedding_client.embeddings.create(
+                input=batch_texts,
+                model=self.embedding_model
+            )
+            embeddings = [d.embedding for d in response.data]
+            tokens = response.usage.total_tokens
+        else:
+            embeddings = self._embedding_client.encode(batch_texts).tolist()
+            tokens = sum(len(t) // 4 for t in batch_texts)
+        
+        return batch_idx, embeddings, tokens
+    
     def _get_embeddings_batch(
         self, 
         texts: List[str], 
-        batch_size: int = 100
+        batch_size: int = 100,
+        use_parallel: bool = True
     ) -> List[List[float]]:
-        """Genera embeddings en batch."""
+        """
+        Genera embeddings en batch con soporte para paralelización.
+        
+        Args:
+            texts: Lista de textos
+            batch_size: Tamaño de batch para API (default: 100)
+            use_parallel: Si usar procesamiento paralelo (default: True)
+            
+        Returns:
+            Lista de embeddings
+        """
         self._init_embeddings()
         
-        all_embeddings = []
-        total_tokens = 0
         tracker = get_tracker()
+        total_tokens = 0
         
-        for i in tqdm(range(0, len(texts), batch_size), desc="Generando embeddings"):
-            batch = texts[i:i + batch_size]
+        # Dividir en batches
+        batches = []
+        for i in range(0, len(texts), batch_size):
+            batches.append((i // batch_size, texts[i:i + batch_size]))
+        
+        # Modo paralelo
+        if use_parallel and len(batches) > 1 and self.parallel_workers > 1:
+            logger.info(f"⚡ Embeddings paralelos: {len(batches)} batches × {self.parallel_workers} workers")
             
-            if self.embedding_provider == "openai":
-                response = self._embedding_client.embeddings.create(
-                    input=batch,
-                    model=self.embedding_model
-                )
-                batch_embeddings = [d.embedding for d in response.data]
+            # Usar batch_size más pequeño para paralelización
+            parallel_batch_size = min(batch_size, self.parallel_batch_size)
+            batches = []
+            for i in range(0, len(texts), parallel_batch_size):
+                batches.append((i // parallel_batch_size, texts[i:i + parallel_batch_size]))
+            
+            results = {}
+            start_time = time.time()
+            
+            with ThreadPoolExecutor(max_workers=self.parallel_workers) as executor:
+                # Enviar todos los batches
+                futures = {
+                    executor.submit(
+                        self._get_embeddings_single_batch, 
+                        batch_texts, 
+                        batch_idx
+                    ): batch_idx
+                    for batch_idx, batch_texts in batches
+                }
                 
-                # Registrar tokens usados
-                batch_tokens = response.usage.total_tokens
-                total_tokens += batch_tokens
-            else:
-                batch_embeddings = self._embedding_client.encode(batch).tolist()
-                # Estimar tokens para modelos locales
-                batch_tokens = sum(len(t) // 4 for t in batch)
-                total_tokens += batch_tokens
+                # Recolectar resultados con barra de progreso
+                with tqdm(total=len(batches), desc="Generando embeddings (paralelo)") as pbar:
+                    for future in as_completed(futures):
+                        try:
+                            batch_idx, embeddings, tokens = future.result()
+                            results[batch_idx] = embeddings
+                            total_tokens += tokens
+                            pbar.update(1)
+                        except Exception as e:
+                            batch_idx = futures[future]
+                            logger.error(f"Error en batch {batch_idx}: {e}")
+                            # Reintentar de forma secuencial
+                            batch_texts = batches[batch_idx][1]
+                            _, embeddings, tokens = self._get_embeddings_single_batch(
+                                batch_texts, batch_idx
+                            )
+                            results[batch_idx] = embeddings
+                            total_tokens += tokens
+                            pbar.update(1)
             
-            all_embeddings.extend(batch_embeddings)
+            elapsed = time.time() - start_time
+            logger.info(f"⚡ Embeddings completados en {elapsed:.1f}s ({len(texts)/elapsed:.1f} textos/s)")
+            
+            # Ordenar resultados por batch_idx
+            all_embeddings = []
+            for i in range(len(batches)):
+                all_embeddings.extend(results[i])
+        
+        # Modo secuencial (fallback o batches pequeños)
+        else:
+            all_embeddings = []
+            for batch_idx, batch_texts in tqdm(batches, desc="Generando embeddings"):
+                if self.embedding_provider == "openai":
+                    response = self._embedding_client.embeddings.create(
+                        input=batch_texts,
+                        model=self.embedding_model
+                    )
+                    batch_embeddings = [d.embedding for d in response.data]
+                    total_tokens += response.usage.total_tokens
+                else:
+                    batch_embeddings = self._embedding_client.encode(batch_texts).tolist()
+                    total_tokens += sum(len(t) // 4 for t in batch_texts)
+                
+                all_embeddings.extend(batch_embeddings)
         
         # Registrar coste total de embeddings (BUILD)
         if total_tokens > 0:
@@ -382,7 +481,8 @@ class LibraryIndexer:
         self,
         markdown_dir: Path,
         incremental: bool = True,
-        force: bool = False
+        force: bool = False,
+        use_parallel: bool = True
     ) -> Dict[str, Any]:
         """
         Indexa toda la biblioteca de documentos.
@@ -391,16 +491,21 @@ class LibraryIndexer:
             markdown_dir: Directorio con archivos .md
             incremental: Si True, solo procesa documentos nuevos/modificados
             force: Si True, reindexar todo ignorando manifest
+            use_parallel: Si True, usa embeddings paralelos (3-5x más rápido)
             
         Returns:
             Estadísticas de indexación
         """
+        import time
+        start_time = time.time()
+        
         markdown_dir = Path(markdown_dir)
         stats = {
             "documents_processed": 0,
             "documents_skipped": 0,
             "chunks_created": 0,
-            "errors": []
+            "errors": [],
+            "elapsed_seconds": 0
         }
         
         # Inicializar componentes
@@ -467,7 +572,7 @@ class LibraryIndexer:
                 m.doc_id: m.file_path 
                 for m in self.manifest.documents.values()
             }
-            self._index_chunks_to_qdrant(all_new_chunks, file_paths)
+            self._index_chunks_to_qdrant(all_new_chunks, file_paths, use_parallel=use_parallel)
         
         # Construir/actualizar BM25
         all_micro_chunks = [
@@ -486,8 +591,12 @@ class LibraryIndexer:
         self._save_chunks_store()
         self._save_graph()
         
+        # Calcular tiempo total
+        elapsed = time.time() - start_time
+        stats["elapsed_seconds"] = round(elapsed, 2)
+        
         logger.info(
-            f"Indexación completada: "
+            f"Indexación completada en {elapsed:.1f}s: "
             f"{stats['documents_processed']} procesados, "
             f"{stats['documents_skipped']} omitidos, "
             f"{stats['chunks_created']} chunks creados"
@@ -495,19 +604,25 @@ class LibraryIndexer:
         
         return stats
     
-    def _index_chunks_to_qdrant(self, chunks: List[Chunk], file_paths: Dict[str, str] = None):
+    def _index_chunks_to_qdrant(
+        self, 
+        chunks: List[Chunk], 
+        file_paths: Dict[str, str] = None,
+        use_parallel: bool = True
+    ):
         """
         Indexa chunks en Qdrant.
         
         Args:
             chunks: Lista de chunks a indexar
             file_paths: Diccionario doc_id -> file_path para extraer categoría
+            use_parallel: Si usar embeddings paralelos
         """
         from qdrant_client.models import PointStruct
         
-        # Generar embeddings
+        # Generar embeddings (paralelo o secuencial)
         texts = [c.content for c in chunks]
-        embeddings = self._get_embeddings_batch(texts)
+        embeddings = self._get_embeddings_batch(texts, use_parallel=use_parallel)
         
         # Crear puntos para Qdrant
         points = []

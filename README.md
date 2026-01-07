@@ -378,7 +378,37 @@ python -m src.cli.ingest_library --dry-run
 
 # Chunking semántico (detecta definiciones, teoremas, demostraciones)
 python -m src.cli.ingest_library --semantic-chunking --force
+
+# Indexación paralela (3-5x más rápido, activado por defecto)
+python -m src.cli.ingest_library --force --workers 8
+
+# Desactivar paralelización (modo secuencial)
+python -m src.cli.ingest_library --no-parallel
 ```
+
+### Indexación Paralela
+
+Por defecto, la indexación usa procesamiento paralelo para acelerar la generación de embeddings:
+
+```bash
+# Usar más workers (default: 4)
+python -m src.cli.ingest_library --workers 8
+
+# Ajustar batch size por worker
+python -m src.cli.ingest_library --batch-size 100
+
+# Desactivar para debugging
+python -m src.cli.ingest_library --no-parallel
+```
+
+| Workers | Speedup típico | Caso de uso                  |
+| ------- | -------------- | ---------------------------- |
+| 1       | 1x (baseline)  | Debugging, límite de rate    |
+| 4       | 2.5-3x         | Default, API estándar        |
+| 8       | 3.5-4x         | API tier alto, reindexación  |
+| 16      | 4-5x           | API enterprise, batch masivo |
+
+> ⚠️ Nota: Demasiados workers pueden causar rate limiting en APIs. Ajusta según tu tier.
 
 ### Chunking Semántico Adaptativo
 

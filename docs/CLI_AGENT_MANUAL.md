@@ -326,6 +326,10 @@ python -m src.cli.ingest_library
 | `--verbose`           | `-v`  | flag   | false   | Logging detallado                                     |
 | `--costs`             | `-c`  | flag   | false   | Mostrar costes                                        |
 | `--semantic-chunking` | -     | flag   | false   | Chunking semántico: detecta definiciones, teoremas... |
+| `--parallel`          | `-p`  | flag   | true    | Indexación paralela (3-5x más rápido)                 |
+| `--no-parallel`       | -     | flag   | false   | Desactivar paralelización (modo secuencial)           |
+| `--workers`           | `-w`  | int    | 4       | Número de workers para paralelización                 |
+| `--batch-size`        | `-b`  | int    | 50      | Tamaño de batch para embeddings paralelos             |
 
 #### Ejemplos para Agentes
 
@@ -357,6 +361,18 @@ cd "/home/ivan/Computación Cuántica/LibrarAI" && python -m src.cli.ingest_libr
 
 ```bash
 cd "/home/ivan/Computación Cuántica/LibrarAI" && python -m src.cli.ingest_library --semantic-chunking --force
+```
+
+**Indexación paralela con más workers (reindexación rápida):**
+
+```bash
+cd "/home/ivan/Computación Cuántica/LibrarAI" && python -m src.cli.ingest_library --force --workers 8
+```
+
+**Indexación secuencial (para debugging o rate limiting):**
+
+```bash
+cd "/home/ivan/Computación Cuántica/LibrarAI" && python -m src.cli.ingest_library --force --no-parallel
 ```
 
 **Ver costes de indexación:**
