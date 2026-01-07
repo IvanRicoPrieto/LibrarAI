@@ -1,24 +1,32 @@
-# � LibrarAI - Tu Biblioteca Inteligente
+# 📚 LibrarAI - Tu Biblioteca Inteligente
 
 Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Física, Matemáticas y cualquier otra área del conocimiento.
+
+> 📖 **Documentación técnica completa:** [docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md)  
+> 🤖 **Manual para agentes IA:** [docs/CLI_AGENT_MANUAL.md](docs/CLI_AGENT_MANUAL.md)
 
 ## 📋 Características
 
 - **🔍 Búsqueda híbrida**: Vector (semántica) + BM25 (léxica) + Grafo (relaciones)
 - **🎯 Re-ranking**: Cross-Encoder opcional que mejora precisión +15-25%
-- **📝 Evaluación RAGAS**: Pipeline de evaluación con métricas de calidad RAG
-- **💾 Cache de Embeddings**: Reduce costes 70-90% y elimina latencia en queries repetidas
-- **💰 Caché Semántico**: Reutiliza respuestas para queries similares (100% ahorro por hit)
-- **📦 Compresión de Contexto**: Reduce tokens 30-60%, permite más contexto por consulta
+- **🚀 HyDE**: Query expansion con documentos hipotéticos (+10-20% recall)
+- **📝 Evaluación RAGAS**: Pipeline de evaluación con 6 métricas de calidad
+- **💾 Cache de Embeddings**: Reduce costes 70-90% y elimina latencia
+- **💰 Caché Semántico**: Reutiliza respuestas similares (100% ahorro por hit)
+- **📦 Compresión de Contexto**: Reduce tokens 30-60%, permite más contexto
 - **🧠 Chunking Semántico**: Detecta límites naturales (definiciones, teoremas, demostraciones)
 - **📚 Chunking jerárquico**: 3 niveles (Macro/Meso/Micro) con auto-merge inteligente
 - **📝 Citas precisas**: Referencias `[n]` a fuentes específicas con ubicación
 - **🤖 Multi-LLM**: Claude Sonnet 4.5, GPT-4.1, modelos locales (Ollama)
-- **⚡ Indexación incremental**: Solo procesa documentos nuevos/modificados
-- **🕸️ Grafo de conocimiento**: Extracción automática de entidades y relaciones
+- **⚡ Indexación paralela**: 3-5x más rápida con workers concurrentes
+- **🕸️ Grafo de conocimiento**: 18 entidades + 19 relaciones (ontología extendida)
 - **🔬 Deep Research**: Descomposición de queries complejas con búsqueda iterativa
-- **✅ Validación de citas**: Critic que verifica que las citas tienen soporte real
-- **🖥️ Code Sandbox**: Ejecución segura de código Python para cálculos y gráficas
+- **✅ Validación de citas**: Critic que verifica soporte real
+- **🖥️ Code Sandbox**: Ejecución segura con validación AST y whitelist ampliada
+- **💬 Memoria Conversacional**: Sesiones multi-turno con detección de followup
+- **🐳 Docker**: Stack completo con Qdrant + App + Sandbox aislado
+- **📊 Logging Estructurado**: structlog con tracing y métricas
+- **🧪 Tests**: 66 tests unitarios + integración
 
 ## 🚀 Instalación
 
