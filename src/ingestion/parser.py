@@ -53,26 +53,33 @@ class ParsedDocument:
 class MarkdownParser:
     """
     Parser de Markdown que extrae estructura jerárquica y metadatos.
-    
+
     Características:
     - Extrae jerarquía de encabezados (#, ##, ###, etc.)
     - Genera header_path para cada sección
     - Preserva bloques de código y fórmulas como unidades atómicas
     - Calcula hashes para detección de cambios
+    - (Opcional) Describe imágenes referenciadas via vision LLM
     """
-    
+
     # Patrones regex
     HEADER_PATTERN = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
     CODE_BLOCK_PATTERN = re.compile(r'```[\s\S]*?```', re.MULTILINE)
     LATEX_BLOCK_PATTERN = re.compile(r'\$\$[\s\S]*?\$\$', re.MULTILINE)
     LATEX_INLINE_PATTERN = re.compile(r'\$[^\$\n]+\$')
-    
+
     def __init__(self, min_section_length: int = 50):
         """
         Args:
             min_section_length: Longitud mínima de una sección para ser incluida
         """
         self.min_section_length = min_section_length
+        self._image_describer = None
+
+    def set_image_describer(self, cache_dir: Path):
+        """Habilita descripción de imágenes con vision LLM."""
+        from .image_describer import ImageDescriber
+        self._image_describer = ImageDescriber(cache_dir)
     
     def parse_file(self, file_path: Path) -> ParsedDocument:
         """
@@ -94,12 +101,16 @@ class MarkdownParser:
         
         # Leer contenido
         content = file_path.read_text(encoding='utf-8')
-        
+
+        # Describir imágenes (si habilitado)
+        if self._image_describer:
+            content = self._image_describer.process_document_images(content, file_path)
+
         # Generar IDs
         doc_id = self._generate_doc_id(file_path)
         doc_title = self._extract_title(content, file_path)
         full_hash = hashlib.sha256(content.encode()).hexdigest()
-        
+
         # Parsear secciones
         sections = self._parse_sections(content, doc_id, doc_title)
         

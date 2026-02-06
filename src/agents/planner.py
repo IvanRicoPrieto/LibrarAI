@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 import re
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -127,19 +126,15 @@ class QueryPlanner:
     def __init__(
         self,
         use_llm_planner: bool = False,
-        llm_model: str = "gpt-4o-mini",
         max_steps: int = 5
     ):
         """
         Args:
             use_llm_planner: Si usar LLM para planificación
-            llm_model: Modelo para planificación
             max_steps: Máximo número de pasos
         """
         self.use_llm_planner = use_llm_planner
-        self.llm_model = llm_model
         self.max_steps = max_steps
-        self._llm_client = None
     
     def plan(self, query: str) -> ExecutionPlan:
         """
@@ -291,8 +286,8 @@ class QueryPlanner:
     
     def _plan_with_llm(self, query: str) -> ExecutionPlan:
         """Planificación usando LLM."""
-        self._init_llm()
-        
+        from src.llm_provider import complete as llm_complete
+
         prompt = f"""Descompón esta consulta en pasos de ejecución.
 
 CONSULTA: {query}
@@ -319,18 +314,13 @@ Responde en JSON:
 }}
 
 Máximo {self.max_steps} pasos."""
-        
+
         try:
-            response = self._llm_client.chat.completions.create(
-                model=self.llm_model,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-                temperature=0.1
-            )
-            
+            response = llm_complete(prompt=prompt, json_mode=True, temperature=0.1)
+
             import json
-            result = json.loads(response.choices[0].message.content)
-            
+            result = json.loads(response.content)
+
             steps = []
             for s in result.get("steps", [])[:self.max_steps]:
                 steps.append(PlanStep(
@@ -340,14 +330,14 @@ Máximo {self.max_steps} pasos."""
                     depends_on=s.get("depends_on", []),
                     params=s.get("params", {})
                 ))
-            
+
             if not steps:
                 steps = [PlanStep(step_id=0, step_type=StepType.RETRIEVE, query=query)]
-            
+
             estimated_retrievals = sum(
                 1 for s in steps if s.step_type == StepType.RETRIEVE
             )
-            
+
             return ExecutionPlan(
                 original_query=query,
                 steps=steps,
@@ -355,19 +345,7 @@ Máximo {self.max_steps} pasos."""
                 estimated_tokens=estimated_retrievals * 2000,
                 reasoning=result.get("reasoning", "")
             )
-            
+
         except Exception as e:
             logger.warning(f"LLM planning failed: {e}, using heuristics")
             return self._plan_with_heuristics(query)
-    
-    def _init_llm(self):
-        """Inicializa cliente LLM."""
-        if self._llm_client is not None:
-            return
-        
-        from openai import OpenAI
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY no configurada")
-        
-        self._llm_client = OpenAI(api_key=api_key)

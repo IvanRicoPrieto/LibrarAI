@@ -684,26 +684,19 @@ if _sandbox_figures:
     def generate_and_execute(
         self,
         prompt: str,
-        model: str = "gpt-4.1-mini"
     ) -> tuple[str, SandboxResult]:
         """
         Genera código con LLM y lo ejecuta.
-        
+
         Args:
             prompt: Descripción de lo que calcular/graficar
-            model: Modelo LLM a usar
-        
+
         Returns:
             (código_generado, resultado_ejecución)
         """
-        import openai
-        
-        client = openai.OpenAI()
-        
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": f"""Eres un asistente que genera código Python para cálculos científicos y visualizaciones.
+        from src.llm_provider import complete as llm_complete
+
+        system_prompt = f"""Eres un asistente que genera código Python para cálculos científicos y visualizaciones.
 
 Reglas:
 1. Imports permitidos: {', '.join(sorted(ALLOWED_IMPORTS))}
@@ -713,14 +706,16 @@ Reglas:
 5. Usa comentarios para explicar pasos importantes
 6. Imprime resultados relevantes con print()
 
-Responde SOLO con el código Python, sin explicaciones ni markdown."""},
-                {"role": "user", "content": prompt}
-            ],
+Responde SOLO con el código Python, sin explicaciones ni markdown."""
+
+        response = llm_complete(
+            prompt=prompt,
+            system=system_prompt,
             temperature=0.2,
-            max_tokens=1000
+            max_tokens=1000,
         )
-        
-        code = response.choices[0].message.content.strip()
+
+        code = response.content.strip()
         
         # Limpiar posibles marcadores de código
         if code.startswith("```python"):

@@ -1,6 +1,6 @@
 # 🤖 CLI Agent Manual - LibrarAI
 
-**Manual de uso de la CLI optimizado para agentes de IA (GitHub Copilot, etc.)**
+**Manual de uso de la CLI optimizado para agentes de IA (Claude Code, etc.)**
 
 Este documento describe cómo un agente de IA debe interactuar con el sistema LibrarAI a través de la línea de comandos.
 
@@ -108,6 +108,64 @@ cd "/home/ivan/Computación Cuántica/LibrarAI" && source .venv/bin/activate && 
 ---
 
 ## 🔧 Comandos Disponibles
+
+### 0. CLI para Agentes (`librari`) - RECOMENDADO
+
+**Propósito:** API JSON estructurada optimizada para agentes de IA.
+
+> **Todos los outputs son JSON parseables directamente.**
+
+#### Comandos Disponibles
+
+| Comando | Descripción | Ejemplo |
+|---------|-------------|---------|
+| `stats` | Estadísticas de la biblioteca | `librari stats` |
+| `explore` | Descubrir contenido disponible | `librari explore "tema"` |
+| `retrieve` | Obtener contenido exhaustivo | `librari retrieve "tema" --exhaustive` |
+| `query` | Respuesta con citas | `librari query "pregunta" --grounded` |
+| `verify` | Verificar afirmación | `librari verify --claim "afirmación"` |
+| `cite` | Generar citas formateadas | `librari cite --chunks "id1,id2" --style apa` |
+
+#### Ejemplos de Uso
+
+```bash
+# Ver estadísticas de la biblioteca
+cd "/home/ivan/Computación Cuántica/LibrarAI" && python -m src.cli.librari stats
+
+# Explorar qué hay sobre un tema
+python -m src.cli.librari explore "algoritmo de Shor"
+
+# Recuperar TODO el contenido sobre un tema
+python -m src.cli.librari retrieve "QFT" --exhaustive
+
+# Pregunta con citas grounded
+python -m src.cli.librari query "¿Cuál es la complejidad de Shor?" --grounded
+
+# Verificar una afirmación
+python -m src.cli.librari verify --claim "Shor factoriza en O(log³n)"
+
+# Generar citas
+python -m src.cli.librari cite --chunks "nc_micro_000123" --style apa
+```
+
+#### Estructura de Output JSON
+
+```json
+{
+  "mode": "query",
+  "query": "...",
+  "answer": "...",
+  "claims": [
+    {"claim": "...", "citations": ["chunk_id1", "chunk_id2"]}
+  ],
+  "confidence_score": 0.95,
+  "sources_used": ["Nielsen & Chuang", "Watrous"]
+}
+```
+
+**Ver documentación completa en [CLAUDE.md](../CLAUDE.md)**
+
+---
 
 ### 1. Consultar la Biblioteca (`ask_library`)
 

@@ -257,7 +257,7 @@ def save_session(
 
 class RAGPipeline:
     """Pipeline RAG completo."""
-    
+
     def __init__(
         self,
         indices_dir: Path,
@@ -273,7 +273,19 @@ class RAGPipeline:
         use_semantic_cache: bool = True,
         semantic_cache_threshold: float = 0.92,
         compress_context: bool = False,
-        compress_level: str = "medium"
+        compress_level: str = "medium",
+        use_crag: bool = False,
+        use_agentic: bool = False,
+        agentic_max_iterations: int = 4,
+        use_propositions: bool = False,
+        # Nuevas mejoras avanzadas
+        use_multi_query: bool = False,
+        multi_query_variations: int = 4,
+        use_self_rag: bool = False,
+        use_colbert_rerank: bool = False,
+        use_grounded_citations: bool = False,
+        min_grounding_score: float = 0.8,
+        use_hierarchical_routing: bool = False
     ):
         self.indices_dir = indices_dir
         self.config = config
@@ -289,7 +301,20 @@ class RAGPipeline:
         self.semantic_cache_threshold = semantic_cache_threshold
         self.compress_context = compress_context
         self.compress_level = compress_level
-        
+        self.use_crag = use_crag
+        self.use_agentic = use_agentic
+        self.agentic_max_iterations = agentic_max_iterations
+        self.use_propositions = use_propositions
+        # Nuevas mejoras
+        self.use_multi_query = use_multi_query
+        self.multi_query_variations = multi_query_variations
+        self.use_self_rag = use_self_rag
+        self.use_colbert_rerank = use_colbert_rerank
+        self.use_grounded_citations = use_grounded_citations
+        self.min_grounding_score = min_grounding_score
+        self.use_hierarchical_routing = use_hierarchical_routing
+        self._context_budget = config.get("generation", {}).get("context_budget", 16000)
+
         # Componentes (lazy init)
         self._retriever = None
         self._synthesizer = None
@@ -298,6 +323,14 @@ class RAGPipeline:
         self._citation_injector = None
         self._semantic_cache = None
         self._context_compressor = None
+        self._corrective_rag = None
+        self._agentic_pipeline = None
+        # Nuevos componentes
+        self._multi_query_expander = None
+        self._self_rag_pipeline = None
+        self._colbert_reranker = None
+        self._grounding_system = None
+        self._hierarchical_index = None
     
     def _init_components(self):
         """Inicializa componentes del pipeline."""
@@ -336,7 +369,6 @@ class RAGPipeline:
         gen_config = self.config.get("generation", {})
         
         self._synthesizer = ResponseSynthesizer(
-            model=self.model,
             temperature=gen_config.get("temperature", 0.3),
             max_output_tokens=gen_config.get("max_tokens", 2000)
         )
@@ -384,7 +416,120 @@ class RAGPipeline:
             except Exception as e:
                 logger.warning(f"No se pudo inicializar compresor: {e}")
                 self._context_compressor = None
-    
+
+        # Corrective RAG
+        if self.use_crag:
+            try:
+                from ..retrieval.corrective_rag import CorrectiveRAG
+                crag_config = self.config.get("corrective_rag", {})
+                self._corrective_rag = CorrectiveRAG(
+                    retriever=self._retriever,
+                    correct_threshold=crag_config.get("correct_threshold", 0.7),
+                    incorrect_threshold=crag_config.get("incorrect_threshold", 0.3),
+                    use_llm_assessment=crag_config.get("use_llm", True)
+                )
+                logger.info("Corrective RAG inicializado")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar CRAG: {e}")
+                self._corrective_rag = None
+
+        # Agentic RAG
+        if self.use_agentic:
+            try:
+                from ..agents.agentic_rag import AgenticRAGPipeline
+                agentic_config = self.config.get("agentic_rag", {})
+                self._agentic_pipeline = AgenticRAGPipeline(
+                    retriever=self._retriever,
+                    synthesizer=self._synthesizer,
+                    max_iterations=self.agentic_max_iterations,
+                    confidence_threshold=agentic_config.get("confidence_threshold", 0.7),
+                    min_new_results=agentic_config.get("min_new_results", 2)
+                )
+                logger.info("Agentic RAG inicializado")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar Agentic RAG: {e}")
+                self._agentic_pipeline = None
+
+        # === Nuevas mejoras avanzadas ===
+
+        # Multi-Query RAG
+        if self.use_multi_query:
+            try:
+                from ..retrieval.multi_query import MultiQueryExpander
+                mq_config = self.config.get("multi_query", {})
+                self._multi_query_expander = MultiQueryExpander(
+                    n_variations=self.multi_query_variations,
+                    use_llm=mq_config.get("use_llm", True)
+                )
+                logger.info(f"Multi-Query RAG inicializado ({self.multi_query_variations} variaciones)")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar Multi-Query: {e}")
+                self._multi_query_expander = None
+
+        # Self-RAG
+        if self.use_self_rag:
+            try:
+                from ..agents.self_rag import SelfRAGPipeline
+                self_rag_config = self.config.get("self_rag", {})
+                self._self_rag_pipeline = SelfRAGPipeline(
+                    retriever=self._retriever,
+                    synthesizer=self._synthesizer,
+                    max_iterations=self_rag_config.get("max_iterations", 3),
+                    min_relevance_ratio=self_rag_config.get("min_relevance_ratio", 0.5),
+                    require_support=self_rag_config.get("require_support", True)
+                )
+                logger.info("Self-RAG inicializado")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar Self-RAG: {e}")
+                self._self_rag_pipeline = None
+
+        # ColBERT Reranker
+        if self.use_colbert_rerank:
+            try:
+                from ..retrieval.colbert_retriever import ColBERTReranker
+                colbert_config = self.config.get("colbert", {})
+                self._colbert_reranker = ColBERTReranker(
+                    model_name=colbert_config.get("model_name", "colbert-ir/colbertv2.0")
+                )
+                if self._colbert_reranker._available:
+                    logger.info("ColBERT Reranker inicializado")
+                else:
+                    logger.warning("ColBERT no disponible (instala: pip install ragatouille)")
+                    self._colbert_reranker = None
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar ColBERT: {e}")
+                self._colbert_reranker = None
+
+        # Citation Grounding
+        if self.use_grounded_citations:
+            try:
+                from ..generation.citation_grounding import CitationGroundingSystem
+                grounding_config = self.config.get("citation_grounding", {})
+                self._grounding_system = CitationGroundingSystem(
+                    min_grounding_score=self.min_grounding_score,
+                    require_all_cited=grounding_config.get("require_all_cited", True),
+                    use_llm_verification=grounding_config.get("use_llm_verification", True)
+                )
+                logger.info(f"Citation Grounding inicializado (min: {self.min_grounding_score})")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar Citation Grounding: {e}")
+                self._grounding_system = None
+
+        # Hierarchical Index Routing
+        if self.use_hierarchical_routing:
+            try:
+                from ..retrieval.hierarchical_index import HierarchicalSummaryIndex
+                self._hierarchical_index = HierarchicalSummaryIndex(self.indices_dir)
+                stats = self._hierarchical_index.get_stats()
+                if stats.get("total_summaries", 0) > 0:
+                    logger.info(f"Hierarchical Index cargado: {stats['total_summaries']} resúmenes")
+                else:
+                    logger.warning("Hierarchical Index vacío (ejecuta indexación con --hierarchical)")
+                    self._hierarchical_index = None
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar Hierarchical Index: {e}")
+                self._hierarchical_index = None
+
     def ask(
         self,
         query: str,
@@ -466,7 +611,38 @@ class RAGPipeline:
         if self._router:
             routing = self._router.route(query)
             logger.info(f"Routing: {routing.strategy.value}")
-        
+
+        # === Self-RAG: delegar a pipeline auto-reflexivo ===
+        if self.use_self_rag and self._self_rag_pipeline:
+            response, self_rag_state = self._self_rag_pipeline.ask(
+                query=query,
+                top_k=top_k,
+                stream=stream,
+                stream_callback=stream_callback
+            )
+            # Extraer sources del estado
+            sources = self_rag_state.retrieved_contexts
+            response.metadata["self_rag"] = self_rag_state.to_dict()
+            return response, sources, routing
+
+        # === Multi-Query: expandir query en variaciones ===
+        expanded_query = None
+        if self._multi_query_expander:
+            try:
+                expanded_query = self._multi_query_expander.expand(query)
+                logger.info(f"Multi-Query: {len(expanded_query.all_queries())} queries")
+            except Exception as e:
+                logger.warning(f"Error en Multi-Query expansion: {e}")
+
+        # === Hierarchical Routing: filtrar por resúmenes ===
+        hierarchical_routing = None
+        if self._hierarchical_index:
+            try:
+                hierarchical_routing = self._hierarchical_index.route_query(query)
+                logger.info(f"Hierarchical: {len(hierarchical_routing.candidate_chunk_ids)} chunks candidatos")
+            except Exception as e:
+                logger.warning(f"Error en Hierarchical routing: {e}")
+
         # 2. Retrieval con pesos dinámicos del router
         search_kwargs = {"top_k": top_k}
         if routing:
@@ -478,12 +654,79 @@ class RAGPipeline:
                 "bm25": routing.bm25_weight,
                 "graph": routing.graph_weight
             }
-        
+
         if filters:
             search_kwargs["filters"] = filters
-        
-        sources = self._retriever.search(query, **search_kwargs)
-        
+
+        # Si agentic mode, delegar al pipeline agéntico
+        if self.use_agentic and self._agentic_pipeline:
+            response, agentic_sources, agent_state = self._agentic_pipeline.ask(
+                query=query,
+                top_k=top_k,
+                stream=stream,
+                stream_callback=stream_callback
+            )
+            response.metadata["agentic"] = {
+                "iterations": agent_state.iteration,
+                "confidence": agent_state.confidence,
+                "strategies_used": agent_state.search_strategies_used,
+                "reasoning_trace": agent_state.reasoning_trace
+            }
+            return response, agentic_sources, routing
+
+        # === Retrieval (con Multi-Query si habilitado) ===
+        if expanded_query and len(expanded_query.all_queries()) > 1:
+            # Multi-Query: buscar con todas las variaciones y fusionar
+            all_sources = []
+            seen_chunk_ids = set()
+            for q in expanded_query.all_queries():
+                q_sources = self._retriever.search(q, **search_kwargs)
+                for s in q_sources:
+                    if s.chunk_id not in seen_chunk_ids:
+                        seen_chunk_ids.add(s.chunk_id)
+                        all_sources.append(s)
+            # Ordenar por score y limitar
+            all_sources.sort(key=lambda x: -x.score)
+            sources = all_sources[:top_k * 2]
+            logger.info(f"Multi-Query retrieval: {len(sources)} fuentes únicas")
+        else:
+            sources = self._retriever.search(query, **search_kwargs)
+
+        # === Hierarchical filtering: priorizar chunks de secciones relevantes ===
+        if hierarchical_routing and hierarchical_routing.candidate_chunk_ids:
+            prioritized = []
+            other = []
+            for s in sources:
+                if s.chunk_id in hierarchical_routing.candidate_chunk_ids:
+                    s.score *= 1.15  # Boost por estar en routing
+                    prioritized.append(s)
+                else:
+                    other.append(s)
+            sources = prioritized + other
+            sources.sort(key=lambda x: -x.score)
+            sources = sources[:top_k]
+
+        # === ColBERT Reranking ===
+        if self._colbert_reranker and sources:
+            try:
+                sources = self._colbert_reranker.rerank(query, sources, top_k=top_k)
+                logger.info("ColBERT reranking aplicado")
+            except Exception as e:
+                logger.warning(f"Error en ColBERT reranking: {e}")
+
+        # 2.3 Corrective RAG (si habilitado)
+        if self._corrective_rag and sources:
+            try:
+                crag_result = self._corrective_rag.correct(query, sources, top_k=top_k)
+                sources = crag_result.corrected_results
+                logger.info(
+                    f"CRAG: action={crag_result.action_taken}, "
+                    f"correct={crag_result.stats.get('correct', 0)}, "
+                    f"incorrect={crag_result.stats.get('incorrect', 0)}"
+                )
+            except Exception as e:
+                logger.warning(f"Error en CRAG, usando resultados originales: {e}")
+
         if not sources:
             # Sin fuentes, responder que no hay información
             from ..generation.synthesizer import GeneratedResponse
@@ -492,7 +735,7 @@ class RAGPipeline:
                 query=query,
                 query_type="none",
                 sources_used=[],
-                model=self.model,
+                model="n/a",
                 tokens_input=0,
                 tokens_output=0,
                 latency_ms=0,
@@ -527,7 +770,7 @@ class RAGPipeline:
                 query=query,
                 query_type="abstention",
                 sources_used=[],
-                model=self.model,
+                model="n/a",
                 tokens_input=0,
                 tokens_output=0,
                 latency_ms=0,
@@ -557,7 +800,7 @@ class RAGPipeline:
                 contexts = [s.content for s in sources]
                 compressed_contexts, compression_stats = self._context_compressor.compress_contexts(
                     contexts,
-                    max_total_tokens=4000  # Presupuesto de tokens para contexto
+                    max_total_tokens=self._context_budget
                 )
                 
                 if compression_stats.get("compression_applied"):
@@ -585,13 +828,56 @@ class RAGPipeline:
                 compressed_sources = sources
         
         # 3. Generation (usando sources comprimidas si aplica)
-        response = self._synthesizer.generate(
-            query=query,
-            results=compressed_sources,
-            stream=stream,
-            stream_callback=stream_callback
-        )
-        
+        # === Citation Grounding: genera con citas verificables ===
+        if self._grounding_system:
+            try:
+                # Generar con citas obligatorias
+                cited_content = self._grounding_system.generate_with_citations(
+                    query, compressed_sources
+                )
+                # Verificar y mejorar grounding
+                final_content, grounding_result = self._grounding_system.enforce_grounding(
+                    cited_content, compressed_sources
+                )
+
+                from ..generation.synthesizer import GeneratedResponse
+                response = GeneratedResponse(
+                    content=final_content,
+                    query=query,
+                    query_type="grounded",
+                    sources_used=[s.chunk_id for s in compressed_sources],
+                    model="grounded_synthesis",
+                    tokens_input=0,
+                    tokens_output=0,
+                    latency_ms=0,
+                    metadata={
+                        "grounding": grounding_result.to_dict(),
+                        "grounding_score": grounding_result.grounding_score
+                    }
+                )
+                logger.info(f"Citation Grounding: score={grounding_result.grounding_score:.2f}")
+            except Exception as e:
+                logger.warning(f"Error en Citation Grounding, usando generación normal: {e}")
+                response = self._synthesizer.generate(
+                    query=query,
+                    results=compressed_sources,
+                    stream=stream,
+                    stream_callback=stream_callback
+                )
+        else:
+            response = self._synthesizer.generate(
+                query=query,
+                results=compressed_sources,
+                stream=stream,
+                stream_callback=stream_callback
+            )
+
+        # Añadir metadata de mejoras avanzadas
+        if expanded_query:
+            response.metadata["multi_query"] = expanded_query.to_dict()
+        if hierarchical_routing:
+            response.metadata["hierarchical_routing"] = hierarchical_routing.to_dict()
+
         # Añadir stats de compresión a metadata
         if compression_stats:
             response.metadata["compression"] = compression_stats
@@ -708,7 +994,7 @@ class RAGPipeline:
                 query=query,
                 query_type="deep_research_failed",
                 sources_used=[],
-                model=self.model,
+                model="n/a",
                 tokens_input=0,
                 tokens_output=0,
                 latency_ms=0,
@@ -785,33 +1071,58 @@ class RAGPipeline:
     def _decompose_with_llm(self, query: str) -> List[str]:
         """Usa LLM para descomponer query (solo si es realmente necesario)."""
         try:
-            import openai
-            client = openai.OpenAI()
-            
-            response = client.chat.completions.create(
-                model="gpt-4.1-mini",
-                messages=[
-                    {"role": "system", "content": """Eres un asistente que descompone preguntas complejas en sub-preguntas más simples.
+            from src.llm_provider import complete as llm_complete
+            import json
+
+            system_prompt = """Eres un asistente que descompone preguntas complejas en sub-preguntas más simples.
 Devuelve SOLO una lista JSON de strings con las sub-preguntas.
 Si la pregunta ya es simple, devuelve ["pregunta original"].
-Máximo 4 sub-preguntas."""},
-                    {"role": "user", "content": f"Descompón esta pregunta: {query}"}
-                ],
+Máximo 4 sub-preguntas."""
+
+            response = llm_complete(
+                prompt=f"Descompón esta pregunta: {query}",
+                system=system_prompt,
                 temperature=0,
-                max_tokens=200
+                max_tokens=200,
             )
-            
-            import json
-            content = response.choices[0].message.content.strip()
-            # Extraer JSON de la respuesta
-            if "[" in content:
-                json_str = content[content.find("["):content.rfind("]")+1]
-                sub_queries = json.loads(json_str)
-                if isinstance(sub_queries, list) and all(isinstance(s, str) for s in sub_queries):
-                    return sub_queries
+
+            content = response.content.strip()
+            # Extraer JSON array de la respuesta (robusto ante brackets en texto)
+            sub_queries = self._extract_json_array(content)
+            if sub_queries is not None:
+                return sub_queries
         except Exception as e:
             logger.warning(f"Error en descomposición LLM: {e}")
-        
+
+        return None
+
+    @staticmethod
+    def _extract_json_array(text: str) -> Optional[List[str]]:
+        """Extrae un JSON array de strings de un texto, robusto ante brackets sueltos."""
+        import json
+        # Intentar parsear desde cada '[' encontrado
+        start = 0
+        while True:
+            idx = text.find("[", start)
+            if idx == -1:
+                break
+            # Buscar el ']' correspondiente contando profundidad
+            depth = 0
+            for i in range(idx, len(text)):
+                if text[i] == "[":
+                    depth += 1
+                elif text[i] == "]":
+                    depth -= 1
+                    if depth == 0:
+                        candidate = text[idx:i + 1]
+                        try:
+                            parsed = json.loads(candidate)
+                            if isinstance(parsed, list) and all(isinstance(s, str) for s in parsed):
+                                return parsed
+                        except json.JSONDecodeError:
+                            pass
+                        break
+            start = idx + 1
         return None
 
 
@@ -1159,11 +1470,95 @@ Ejemplos:
     )
     
     parser.add_argument(
+        '--crag',
+        action='store_true',
+        help='Activar Corrective RAG: evalúa relevancia de resultados y reformula si necesario'
+    )
+
+    parser.add_argument(
+        '--agentic',
+        action='store_true',
+        help='Activar Agentic RAG: loop iterativo Retrieve→Reflect→Decide para queries complejas'
+    )
+
+    parser.add_argument(
+        '--max-iterations',
+        type=int,
+        default=4,
+        help='Máximo de iteraciones para Agentic RAG (default: 4)'
+    )
+
+    parser.add_argument(
+        '--use-propositions',
+        action='store_true',
+        help='Incluir búsqueda en proposiciones atómicas (requiere indexación con --propositions)'
+    )
+
+    parser.add_argument(
+        '--export-context',
+        action='store_true',
+        help='Exportar fragmentos de contexto coherentes usados como fuentes (usa LLM para cortes inteligentes)'
+    )
+
+    parser.add_argument(
+        '--context-output',
+        type=str,
+        default=None,
+        help='Archivo para guardar contextos exportados (default: stdout o auto-generado)'
+    )
+
+    parser.add_argument(
         '--costs', '-c',
         action='store_true',
         help='Mostrar resumen de costes acumulados de consultas'
     )
-    
+
+    # === Nuevas mejoras avanzadas ===
+
+    parser.add_argument(
+        '--multi-query',
+        action='store_true',
+        help='Multi-Query RAG: expande query en variaciones para mejorar recall'
+    )
+
+    parser.add_argument(
+        '--query-variations',
+        type=int,
+        default=4,
+        help='Número de variaciones de query para Multi-Query RAG (default: 4)'
+    )
+
+    parser.add_argument(
+        '--self-rag',
+        action='store_true',
+        help='Self-RAG: modo auto-reflexivo que evalúa y refina retrieval/respuesta'
+    )
+
+    parser.add_argument(
+        '--colbert-rerank',
+        action='store_true',
+        help='Usar ColBERT para re-rankear resultados (mejor precisión, requiere ragatouille)'
+    )
+
+    parser.add_argument(
+        '--grounded',
+        action='store_true',
+        help='Citation Grounding: fuerza citas verificables [n] en cada afirmación'
+    )
+
+    parser.add_argument(
+        '--min-grounding',
+        type=float,
+        default=0.8,
+        help='Score mínimo de grounding para Citation Grounding (default: 0.8)'
+    )
+
+    parser.add_argument(
+        '--hierarchical',
+        action='store_true',
+        help='Usar routing jerárquico por resúmenes antes de búsqueda fina'
+    )
+
     args = parser.parse_args()
     
     # Cargar variables de entorno ANTES de cualquier operación
@@ -1319,6 +1714,18 @@ Ejemplos:
     compress_context = args.compress
     compress_level = args.compress_level
     
+    # Determinar si usar CRAG y agentic desde config o CLI
+    use_crag = args.crag or config.get("corrective_rag", {}).get("enabled", False)
+    use_agentic = args.agentic or config.get("agentic_rag", {}).get("enabled", False)
+    use_propositions = args.use_propositions or config.get("proposition_indexing", {}).get("enabled", False)
+
+    # Determinar nuevas mejoras desde config o CLI
+    use_multi_query = args.multi_query or config.get("multi_query", {}).get("enabled", False)
+    use_self_rag = args.self_rag or config.get("self_rag", {}).get("enabled", False)
+    use_colbert_rerank = args.colbert_rerank or config.get("colbert", {}).get("enabled", False)
+    use_grounded = args.grounded or config.get("citation_grounding", {}).get("enabled", False)
+    use_hierarchical = args.hierarchical or config.get("hierarchical_index", {}).get("enabled", False)
+
     # Crear pipeline
     try:
         pipeline = RAGPipeline(
@@ -1335,12 +1742,57 @@ Ejemplos:
             use_semantic_cache=use_semantic_cache,
             semantic_cache_threshold=args.cache_threshold,
             compress_context=compress_context,
-            compress_level=compress_level
+            compress_level=compress_level,
+            use_crag=use_crag,
+            use_agentic=use_agentic,
+            agentic_max_iterations=args.max_iterations,
+            use_propositions=use_propositions,
+            # Nuevas mejoras avanzadas
+            use_multi_query=use_multi_query,
+            multi_query_variations=args.query_variations,
+            use_self_rag=use_self_rag,
+            use_colbert_rerank=use_colbert_rerank,
+            use_grounded_citations=use_grounded,
+            min_grounding_score=args.min_grounding,
+            use_hierarchical_routing=use_hierarchical
         )
     except Exception as e:
         logger.error(f"Error inicializando pipeline: {e}")
         sys.exit(1)
-    
+
+    # Verificar redundancias y advertir
+    redundancy_warnings = []
+    if use_agentic and use_crag:
+        redundancy_warnings.append("⚠️  CRAG es redundante con Agentic RAG (Agentic ya incluye corrección)")
+        use_crag = False  # Desactivar para evitar doble procesamiento
+    if use_agentic and use_self_rag:
+        redundancy_warnings.append("⚠️  Self-RAG es redundante con Agentic RAG (Agentic ya incluye auto-reflexión)")
+        use_self_rag = False
+
+    # Mostrar modos activos (solo si no JSON)
+    if not args.json and (args.query or args.interactive):
+        # Mostrar warnings de redundancia
+        for warn in redundancy_warnings:
+            print(warn)
+
+        if use_crag:
+            print("🔍 Corrective RAG activado")
+        if use_agentic:
+            print(f"🤖 Agentic RAG activado (max {args.max_iterations} iteraciones)")
+        if use_propositions:
+            print("💎 Búsqueda en proposiciones activada")
+        # Nuevas mejoras
+        if use_multi_query:
+            print(f"🔀 Multi-Query RAG activado ({args.query_variations} variaciones)")
+        if use_self_rag:
+            print("🪞 Self-RAG activado (modo auto-reflexivo)")
+        if use_colbert_rerank:
+            print("🎯 ColBERT reranking activado")
+        if use_grounded:
+            print(f"📎 Citation Grounding activado (min: {args.min_grounding})")
+        if use_hierarchical:
+            print("📊 Hierarchical routing activado")
+
     # Modo interactivo
     if args.interactive:
         print_banner()
@@ -1398,7 +1850,68 @@ Ejemplos:
                 sources_only=args.sources,
                 filters=filters
             )
-        
+
+        # Export context: expandir fuentes a fragmentos coherentes con LLM
+        expanded_contexts = None
+        if args.export_context and sources:
+            try:
+                from ..retrieval.context_expander import ContextExpander
+
+                if not args.json:
+                    print("\n🔄 Expandiendo contextos con LLM...")
+
+                expander = ContextExpander(
+                    indices_dir=paths["indices_dir"],
+                    chunks_before=3,
+                    chunks_after=3,
+                    max_context_tokens=2000
+                )
+
+                expanded_contexts = expander.expand_retrieval_results(
+                    sources,
+                    args.query
+                )
+
+                # Preparar output
+                context_output_data = {
+                    "query": args.query,
+                    "timestamp": datetime.now().isoformat(),
+                    "total_expanded": len(expanded_contexts),
+                    "contexts": [ctx.to_dict() for ctx in expanded_contexts]
+                }
+
+                # Determinar dónde escribir
+                if args.context_output:
+                    context_path = Path(args.context_output)
+                else:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    context_path = paths["outputs_dir"] / f"context_{timestamp}.json"
+
+                context_path.parent.mkdir(parents=True, exist_ok=True)
+
+                with open(context_path, 'w', encoding='utf-8') as f:
+                    json.dump(context_output_data, ensure_ascii=False, indent=2, fp=f)
+
+                if not args.json:
+                    print(f"✅ Contextos exportados a: {context_path}")
+                    print(f"   {len(expanded_contexts)} fragmentos coherentes extraídos")
+
+                    # Mostrar resumen de cada contexto
+                    print("\n📄 Resumen de contextos exportados:")
+                    print("─" * 50)
+                    for i, ctx in enumerate(expanded_contexts, 1):
+                        print(f"\n[{i}] {ctx.source_citation}")
+                        print(f"    📝 {ctx.topic_summary}")
+                        print(f"    🎯 {ctx.relevance_to_query[:100]}..." if len(ctx.relevance_to_query) > 100 else f"    🎯 {ctx.relevance_to_query}")
+                        print(f"    📊 {ctx.token_count} tokens")
+                    print("─" * 50)
+
+            except Exception as e:
+                logger.warning(f"Error expandiendo contextos: {e}")
+                if args.verbose:
+                    import traceback
+                    traceback.print_exc()
+
         if args.json:
             output = {
                 "query": args.query,
@@ -1406,6 +1919,9 @@ Ejemplos:
                 "sources": [s.to_dict() for s in sources],
                 "routing": routing.to_dict() if routing else None
             }
+            # Incluir contextos expandidos si se generaron
+            if expanded_contexts:
+                output["expanded_contexts"] = [ctx.to_dict() for ctx in expanded_contexts]
             print(json.dumps(output, ensure_ascii=False, indent=2))
         elif args.sources:
             # Modo solo fuentes: mostrar fuentes detalladas

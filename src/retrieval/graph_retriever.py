@@ -148,69 +148,111 @@ class GraphRetriever:
     def build_graph_from_chunks(self, use_llm: bool = False, sample_rate: float = 0.1):
         """
         Construye grafo extrayendo entidades y relaciones de los chunks.
-        
+
         Args:
-            use_llm: Si usar LLM para extracción (más preciso, más costoso)
+            use_llm: Si usar LLM para extracción (más preciso, más costoso).
+                     Cuando True, usa LLMGraphExtractor para extracción alineada a ontología.
             sample_rate: Si use_llm=True, qué proporción de chunks procesar con LLM
                          (el resto usa regex). Valor 0-1.
         """
         import networkx as nx
         import random
-        
+
         self._load_chunks_store()
         self._graph = nx.DiGraph()
-        
+
         if not self._chunks_store:
             logger.warning("No hay chunks para construir grafo")
             return
-        
+
         total_chunks = len(self._chunks_store)
         llm_chunks = set()
-        
+
         if use_llm and sample_rate > 0:
             # Seleccionar muestra de chunks para procesar con LLM
             n_llm = max(1, int(total_chunks * sample_rate))
             llm_chunks = set(random.sample(list(self._chunks_store.keys()), n_llm))
             logger.info(f"GraphRAG con LLM: {n_llm}/{total_chunks} chunks ({sample_rate*100:.0f}%)")
-        
-        # Extraer entidades de cada chunk
+
+        # Inicializar LLMGraphExtractor si se usa LLM
+        llm_extractor = None
+        if use_llm and llm_chunks:
+            try:
+                from ..ingestion.graph_builder import LLMGraphExtractor
+                ontology_path = self.ontology_path
+                if ontology_path is None:
+                    # Intentar encontrar ontología en config/
+                    candidate = self.indices_dir.parent / "config" / "ontology.yaml"
+                    if candidate.exists():
+                        ontology_path = candidate
+                llm_extractor = LLMGraphExtractor(ontology_path=ontology_path)
+                logger.info("LLMGraphExtractor inicializado para extracción de grafo")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar LLMGraphExtractor: {e}. Fallback a método anterior.")
+
+        # Procesar chunks LLM en batch con LLMGraphExtractor
+        if llm_extractor and llm_chunks:
+            llm_chunk_list = [
+                (cid, self._chunks_store[cid].content)
+                for cid in llm_chunks
+                if cid in self._chunks_store
+            ]
+            # Procesar en batches
+            batch_size = 5
+            for i in range(0, len(llm_chunk_list), batch_size):
+                batch = llm_chunk_list[i:i + batch_size]
+                try:
+                    extraction_results = llm_extractor.extract_batch(batch)
+                    for result in extraction_results:
+                        # Añadir entidades
+                        for ent in result.entities:
+                            entity = Entity(
+                                name=ent["name"],
+                                entity_type=ent["type"]
+                            )
+                            self._add_entity_to_graph(entity, result.chunk_id)
+                        # Añadir triples como relaciones tipadas
+                        for triple in result.triples:
+                            # Asegurar que source y target existen como nodos
+                            src_entity = Entity(name=triple.source_name, entity_type=triple.source_type)
+                            tgt_entity = Entity(name=triple.target_name, entity_type=triple.target_type)
+                            self._add_entity_to_graph(src_entity, result.chunk_id)
+                            self._add_entity_to_graph(tgt_entity, result.chunk_id)
+                            self._add_relation(
+                                triple.source_name, triple.target_name,
+                                triple.relation_type,
+                                weight=triple.confidence,
+                                chunk_id=result.chunk_id
+                            )
+                except Exception as e:
+                    logger.warning(f"Error en batch LLM de grafo: {e}")
+
+        # Extraer entidades de chunks restantes (regex)
         for chunk_id, chunk in self._chunks_store.items():
-            # Usar LLM para chunks seleccionados, regex para el resto
-            chunk_use_llm = use_llm and chunk_id in llm_chunks
-            entities = self._extract_entities(chunk.content, use_llm=chunk_use_llm)
-            
+            if chunk_id in llm_chunks and llm_extractor:
+                continue  # Ya procesado con LLM
+
+            entities = self._extract_entities_regex(chunk.content)
+
             for entity in entities:
                 self._add_entity_to_graph(entity, chunk_id)
-                
-                # Si el entity tiene relaciones extraídas por LLM, añadirlas
-                if entity.metadata and "relations" in entity.metadata:
-                    for rel_desc in entity.metadata["relations"]:
-                        # Parsear relación: "DEPENDE_DE Entrelazamiento"
-                        parts = rel_desc.split(" ", 1)
-                        if len(parts) == 2:
-                            rel_type, target = parts
-                            self._add_relation(
-                                entity.name, target,
-                                rel_type,
-                                chunk_id=chunk_id
-                            )
-            
+
             # Crear relaciones CO_OCCURS entre entidades co-ocurrentes
             if len(entities) > 1:
                 for i, e1 in enumerate(entities):
                     for e2 in entities[i+1:]:
                         self._add_relation(
-                            e1.name, e2.name, 
-                            "CO_OCCURS", 
+                            e1.name, e2.name,
+                            "CO_OCCURS",
                             chunk_id=chunk_id
                         )
-        
+
         # Guardar grafo
         import pickle
         graph_path = self.indices_dir / "knowledge_graph.gpickle"
         with open(graph_path, 'wb') as f:
             pickle.dump(self._graph, f)
-        
+
         logger.info(f"Grafo construido: {self._graph.number_of_nodes()} nodos, "
                    f"{self._graph.number_of_edges()} aristas")
     
@@ -252,26 +294,17 @@ class GraphRetriever:
         return entities
     
     def _extract_entities_llm(self, text: str) -> List[Entity]:
-        """
-        Extrae entidades usando LLM (más preciso para textos complejos).
-        
-        Usa GPT-4.1-mini por su bajo coste y buena precisión.
-        """
+        """Extrae entidades usando LLM (más preciso para textos complejos)."""
         try:
-            import openai
             import json
-            
-            client = openai.OpenAI()
-            
+            from src.llm_provider import complete as llm_complete
+
             # Truncar texto si es muy largo
             max_chars = 3000
             if len(text) > max_chars:
                 text = text[:max_chars] + "..."
-            
-            response = client.chat.completions.create(
-                model="gpt-4.1-mini",
-                messages=[
-                    {"role": "system", "content": """Extrae entidades de computación/física cuántica del texto.
+
+            system_prompt = """Extrae entidades de computación/física cuántica del texto.
 Devuelve JSON con formato:
 {
   "entities": [
@@ -282,40 +315,28 @@ Devuelve JSON con formato:
 Tipos válidos: Algoritmo, Protocolo, Concepto, Gate, Autor, Teorema, Ecuación
 Relaciones válidas: MEJORA, DEPENDE_DE, IMPLEMENTA, EQUIVALENTE_A, DEFINE, DEMUESTRA, USA
 
-Solo incluye entidades claramente identificables del dominio cuántico."""},
-                    {"role": "user", "content": f"Texto:\n{text}"}
-                ],
+Solo incluye entidades claramente identificables del dominio cuántico."""
+
+            response = llm_complete(
+                prompt=f"Texto:\n{text}",
+                system=system_prompt,
                 temperature=0,
                 max_tokens=500,
-                response_format={"type": "json_object"}
+                json_mode=True,
             )
-            
-            result = json.loads(response.choices[0].message.content)
+
+            result = json.loads(response.content)
             entities = []
-            
+
             for e in result.get("entities", []):
                 entities.append(Entity(
                     name=e.get("name", ""),
                     entity_type=e.get("type", "Concepto"),
                     metadata={"relations": e.get("relations", [])}
                 ))
-            
-            # Track del coste
-            try:
-                from ..utils.cost_tracker import get_tracker, UsageType
-                tracker = get_tracker()
-                tracker.record_generation(
-                    model="gpt-4.1-mini",
-                    tokens_input=response.usage.prompt_tokens,
-                    tokens_output=response.usage.completion_tokens,
-                    usage_type=UsageType.BUILD,
-                    query="entity_extraction"
-                )
-            except Exception:
-                pass
-            
+
             return entities
-            
+
         except Exception as e:
             logger.warning(f"Error en extracción LLM: {e}. Fallback a regex.")
             return self._extract_entities_regex(text)

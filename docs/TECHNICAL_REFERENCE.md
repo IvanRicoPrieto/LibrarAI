@@ -1,7 +1,7 @@
 # 📚 LibrarAI - Documentación Técnica del Sistema
 
-**Versión:** 2.0  
-**Última actualización:** 7 de enero de 2026  
+**Versión:** 2.0
+**Última actualización:** 7 de enero de 2026
 **Estado:** ✅ Sistema completamente implementado y operativo
 
 ---
@@ -30,7 +30,7 @@
 
 - 🔍 **Recuperar información** relevante de documentos Markdown usando búsqueda híbrida
 - 📝 **Generar respuestas** fundamentadas con citas precisas a las fuentes
-- 🤖 **Integración con agentes** como GitHub Copilot para redacción asistida
+- 🤖 **Integración con agentes** como Claude Code para redacción asistida
 - 💰 **Optimización de costes** mediante múltiples capas de caché
 
 ### Estado de Implementación
@@ -111,13 +111,13 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                           USUARIO                                    │
-│                      (Terminal / VS Code / Agente)                   │
+│                           USUARIO                                   │
+│                      (Terminal / VS Code / Agente)                  │
 └────────────────────────────────┬────────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        CAPA DE INTERFAZ                              │
+│                        CAPA DE INTERFAZ                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ CLI Parser   │  │ Session      │  │ Output       │               │
 │  │ (click)      │  │ Manager      │  │ Formatter    │               │
@@ -126,7 +126,7 @@
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        CAPA DE CACHÉ                                 │
+│                        CAPA DE CACHÉ                                │
 │  ┌──────────────┐  ┌──────────────┐                                 │
 │  │ Semantic     │  │ Embedding    │  ← 100% ahorro si hit           │
 │  │ Cache        │  │ Cache        │  ← 70-90% ahorro embeddings     │
@@ -135,7 +135,7 @@
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        CAPA AGÉNTICA                                 │
+│                        CAPA AGÉNTICA                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ Router       │  │ Planner      │  │ Critic       │               │
 │  │ (GPT-4.1-m)  │  │ (Deep Res.)  │  │ (Verify)     │               │
@@ -144,14 +144,14 @@
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     CAPA DE RECUPERACIÓN                             │
+│                     CAPA DE RECUPERACIÓN                            │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ Vector       │  │ BM25         │  │ Graph        │               │
 │  │ Retriever    │  │ Retriever    │  │ Retriever    │               │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘               │
-│         │                 │                 │                        │
-│         └─────────────────┼─────────────────┘                        │
-│                           ▼                                          │
+│         │                 │                 │                       │
+│         └─────────────────┼─────────────────┘                       │
+│                           ▼                                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ HyDE         │  │ RRF Fusion   │  │ Re-Ranker    │               │
 │  │ (opcional)   │  │ + Auto-Merge │  │ (opcional)   │               │
@@ -160,7 +160,7 @@
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      CAPA DE GENERACIÓN                              │
+│                      CAPA DE GENERACIÓN                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ Context      │  │ LLM          │  │ Citation     │               │
 │  │ Compressor   │  │ (Claude)     │  │ Injector     │               │
@@ -169,7 +169,7 @@
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    CAPA DE ALMACENAMIENTO                            │
+│                    CAPA DE ALMACENAMIENTO                           │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ Qdrant       │  │ BM25 Index   │  │ Knowledge    │               │
 │  │ (Docker)     │  │ (Pickle)     │  │ Graph (NX)   │               │
@@ -322,6 +322,29 @@
 | ------------------- | ---------------------------------- |
 | `logging_config.py` | Logging estructurado con structlog |
 | `cost_tracker.py`   | Seguimiento de costes por query    |
+
+### 5.8 Agent API (`src/api/`)
+
+**Nueva API estructurada optimizada para agentes de IA.**
+
+| Archivo              | Función                              |
+| -------------------- | ------------------------------------ |
+| `agent_interface.py` | 5 modos de operación con output JSON |
+| `__init__.py`        | Exports públicos                     |
+
+**Modos de Operación:**
+
+| Modo     | Función                               | Retorna                         |
+| -------- | ------------------------------------- | ------------------------------- |
+| EXPLORE  | Descubrir contenido disponible        | Árbol de contenido, sugerencias |
+| RETRIEVE | Obtener contenido exhaustivo          | Lista completa de chunks        |
+| QUERY    | Responder preguntas con citas         | Respuesta + claims + citations  |
+| VERIFY   | Verificar afirmaciones contra fuentes | Status + evidencia + confianza  |
+| CITE     | Generar citas formateadas             | Citas en APA/IEEE/Chicago/MD    |
+
+**CLI asociado:** `python -m src.cli.librari <comando>`
+
+Ver [CLAUDE.md](../CLAUDE.md) para guía completa de uso.
 
 ---
 
@@ -658,9 +681,9 @@ LibrarAI/
 ### 12.1 Setup Inicial (Una vez)
 
 | Concepto                             | Cálculo          |      Coste |
-| ------------------------------------ | ---------------- | ---------: |
-| Embeddings biblioteca (~375k tokens) | 375k × $0.13/1M  |  **$0.05** |
-| Extracción grafo                     | ~500k × $0.15/1M |  **$0.08** |
+| ------------------------------------ | ---------------- | ---------: | --- |
+| Embeddings biblioteca (~375k tokens) | 375k × $0.13/1M  |  **$0.05** |     |
+| Extracción grafo                     | ~500k × $0.15/1M |  **$0.08** |     |
 | **TOTAL**                            |                  | **~$0.15** |
 
 ### 12.2 Coste por Uso
@@ -676,9 +699,9 @@ LibrarAI/
 ### 12.3 Ahorro con Caché
 
 | Escenario       | Sin Caché | Con Caché | Ahorro |
-| --------------- | --------: | --------: | -----: |
-| 100 queries     |     $3.75 |     $1.50 |    60% |
-| 500 queries/mes |    $18.75 |     $7.50 |    60% |
+| --------------- | --------: | --------: | -----: | --- |
+| 100 queries     |     $3.75 |     $1.50 |    60% |     |
+| 500 queries/mes |    $18.75 |     $7.50 |    60% |     |
 
 ---
 
@@ -686,23 +709,23 @@ LibrarAI/
 
 ### 13.1 Completado (TIER 1-4)
 
-✅ Re-ranking con Cross-Encoder  
-✅ Pipeline RAGAS  
-✅ Cache de Embeddings  
-✅ Filtrado por Metadata  
-✅ Qdrant en Docker  
-✅ HyDE Query Expansion  
-✅ Pesos Dinámicos  
-✅ Ontología Extendida  
-✅ Memoria Conversacional  
-✅ Chunking Semántico  
-✅ Cache Semántico  
-✅ Indexación Paralela  
-✅ Compresión de Contexto  
-✅ Tests Unitarios  
-✅ Dockerización Completa  
-✅ Logging Estructurado  
-✅ Whitelist Sandbox Ampliada  
+✅ Re-ranking con Cross-Encoder
+✅ Pipeline RAGAS
+✅ Cache de Embeddings
+✅ Filtrado por Metadata
+✅ Qdrant en Docker
+✅ HyDE Query Expansion
+✅ Pesos Dinámicos
+✅ Ontología Extendida
+✅ Memoria Conversacional
+✅ Chunking Semántico
+✅ Cache Semántico
+✅ Indexación Paralela
+✅ Compresión de Contexto
+✅ Tests Unitarios
+✅ Dockerización Completa
+✅ Logging Estructurado
+✅ Whitelist Sandbox Ampliada
 ✅ Validación AST
 
 ### 13.2 Trabajo Futuro (TIER 5)

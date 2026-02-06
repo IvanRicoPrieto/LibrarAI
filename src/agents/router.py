@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 import re
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -92,19 +91,15 @@ class QueryRouter:
     def __init__(
         self,
         use_llm_router: bool = False,
-        llm_model: str = "gpt-4o-mini",
         default_top_k: int = 10
     ):
         """
         Args:
             use_llm_router: Si usar LLM para routing
-            llm_model: Modelo para routing (si use_llm_router)
             default_top_k: top_k por defecto
         """
         self.use_llm_router = use_llm_router
-        self.llm_model = llm_model
         self.default_top_k = default_top_k
-        self._llm_client = None
     
     def route(self, query: str) -> RoutingDecision:
         """
@@ -233,8 +228,8 @@ class QueryRouter:
     
     def _route_with_llm(self, query: str) -> RoutingDecision:
         """Routing usando LLM."""
-        self._init_llm()
-        
+        from src.llm_provider import complete as llm_complete
+
         prompt = f"""Analiza esta consulta y decide la mejor estrategia de búsqueda.
 
 CONSULTA: {query}
@@ -256,18 +251,13 @@ Responde en JSON:
     "sub_queries": [],
     "reasoning": "Explicación breve"
 }}"""
-        
+
         try:
-            response = self._llm_client.chat.completions.create(
-                model=self.llm_model,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-                temperature=0.1
-            )
-            
+            response = llm_complete(prompt=prompt, json_mode=True, temperature=0.1)
+
             import json
-            result = json.loads(response.choices[0].message.content)
-            
+            result = json.loads(response.content)
+
             return RoutingDecision(
                 strategy=RetrievalStrategy(result.get("strategy", "HYBRID").lower()),
                 vector_weight=result.get("vector_weight", 0.5),
@@ -280,15 +270,3 @@ Responde en JSON:
         except Exception as e:
             logger.warning(f"LLM routing failed: {e}, using heuristics")
             return self._route_with_heuristics(query)
-    
-    def _init_llm(self):
-        """Inicializa cliente LLM."""
-        if self._llm_client is not None:
-            return
-        
-        from openai import OpenAI
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY no configurada para LLM router")
-        
-        self._llm_client = OpenAI(api_key=api_key)

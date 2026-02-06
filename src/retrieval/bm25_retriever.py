@@ -7,6 +7,7 @@ Complementa la búsqueda vectorial para:
 - Detección de keywords técnicos
 """
 
+import re
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field
@@ -105,8 +106,9 @@ class BM25Retriever:
         """
         self._load_index()
         
-        # Tokenizar query (simple)
-        query_tokens = query.lower().split()
+        # Tokenizar query (misma lógica que el indexer)
+        from ..utils.text_processing import tokenize_for_bm25
+        query_tokens = tokenize_for_bm25(query)
         
         # Obtener scores BM25
         scores = self._bm25_index.get_scores(query_tokens)
@@ -162,10 +164,10 @@ class BM25Retriever:
         for chunk in self._chunks_list:
             content_lower = chunk.content.lower()
             
-            # Contar matches de términos
+            # Contar matches de términos (word boundary para evitar substrings)
             match_count = sum(
-                1 for term in terms 
-                if term.lower() in content_lower
+                1 for term in terms
+                if re.search(r'\b' + re.escape(term.lower()) + r'\b', content_lower)
             )
             
             if match_count > 0:
@@ -205,7 +207,7 @@ class BM25Retriever:
         term_lower = term.lower()
         
         for chunk in self._chunks_list:
-            if term_lower in chunk.content.lower():
+            if re.search(r'\b' + re.escape(term_lower) + r'\b', chunk.content.lower()):
                 doc_ids.add(chunk.doc_id)
         
         return list(doc_ids)

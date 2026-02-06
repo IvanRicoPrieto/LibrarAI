@@ -26,9 +26,6 @@ logger = logging.getLogger(__name__)
 class HyDEConfig:
     """Configuration for HyDE query expansion."""
     
-    # LLM model for generating hypothetical document
-    model: str = "gpt-4o-mini"
-    
     # Temperature for generation (lower = more focused)
     temperature: float = 0.3
     
@@ -62,36 +59,15 @@ class HyDEExpander:
     def __init__(
         self,
         config: Optional[HyDEConfig] = None,
-        llm_client: Optional[object] = None,
     ):
         """
         Initialize HyDE expander.
-        
+
         Args:
             config: HyDE configuration
-            llm_client: Optional pre-configured LLM client
         """
         self.config = config or HyDEConfig()
-        self._llm_client = llm_client
-        self._initialized = False
-    
-    def _get_llm_client(self):
-        """Lazy initialization of LLM client."""
-        if self._llm_client is not None:
-            return self._llm_client
-        
-        if not self._initialized:
-            try:
-                from openai import OpenAI
-                self._llm_client = OpenAI()
-                self._initialized = True
-            except ImportError:
-                raise ImportError(
-                    "openai package required for HyDE. "
-                    "Install with: pip install openai"
-                )
-        return self._llm_client
-    
+
     def generate_hypothetical(
         self,
         query: str,
@@ -100,18 +76,18 @@ class HyDEExpander:
     ) -> str:
         """
         Generate a hypothetical document that would answer the query.
-        
+
         Args:
             query: The user's question
             context_hint: Type of document to simulate
             domain: Subject domain for the hypothetical content
-            
+
         Returns:
             Hypothetical document text
         """
-        client = self._get_llm_client()
-        
-        system_prompt = f"""You are an expert in {domain}. 
+        from src.llm_provider import complete as llm_complete
+
+        system_prompt = f"""You are an expert in {domain}.
 Your task is to write a short, factual passage that would directly answer the given question.
 Write as if you are excerpting from a {context_hint}.
 Be technical, precise, and use appropriate terminology.
@@ -123,20 +99,17 @@ Keep it under 200 words but make it information-dense."""
 Write a passage from a {context_hint} that would contain the answer to this question:"""
 
         try:
-            response = client.chat.completions.create(
-                model=self.config.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+            response = llm_complete(
+                prompt=user_prompt,
+                system=system_prompt,
                 temperature=self.config.temperature,
                 max_tokens=self.config.max_tokens,
             )
-            
-            hypothetical = response.choices[0].message.content
+
+            hypothetical = response.content
             logger.debug(f"HyDE generated hypothetical ({len(hypothetical)} chars)")
             return hypothetical
-            
+
         except Exception as e:
             logger.warning(f"HyDE generation failed: {e}. Using original query.")
             return query

@@ -8,6 +8,7 @@ Soporta:
 - Compresión de contexto (opcional)
 """
 
+import unicodedata
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -216,13 +217,29 @@ Desarrolla la matemática paso a paso, citando las fuentes.""",
         )
     }
     
-    # Palabras clave para detectar tipo de query
+    # Palabras clave para detectar tipo de query (sin acentos, se normalizan al buscar)
     QUERY_KEYWORDS = {
-        QueryType.COMPARATIVE: ["compara", "diferencia", "vs", "versus", "mejor", "ventajas", "desventajas"],
-        QueryType.PROCEDURAL: ["cómo", "pasos", "procedimiento", "implementar", "construir", "aplicar"],
-        QueryType.MATHEMATICAL: ["demostrar", "derivar", "calcular", "fórmula", "ecuación", "operador"],
-        QueryType.SYNTHESIS: ["resumen", "síntesis", "overview", "revisión", "estado del arte"],
-        QueryType.EXPLANATORY: ["explica", "qué es", "definición", "concepto", "significa"]
+        QueryType.COMPARATIVE: [
+            "compara", "comparacion", "diferencia", "vs", "versus",
+            "mejor", "ventajas", "desventajas", "similitudes",
+        ],
+        QueryType.PROCEDURAL: [
+            "como", "pasos", "procedimiento", "implementar",
+            "construir", "aplicar", "algoritmo para", "metodo para",
+        ],
+        QueryType.MATHEMATICAL: [
+            "demostrar", "derivar", "calcular", "formula",
+            "ecuacion", "operador", "hamiltoniano", "eigenvalor",
+            "demostracion", "derivacion",
+        ],
+        QueryType.SYNTHESIS: [
+            "resumen", "sintesis", "overview", "revision",
+            "estado del arte", "panorama", "recapitula",
+        ],
+        QueryType.EXPLANATORY: [
+            "explica", "que es", "definicion", "concepto",
+            "significa", "describe", "introduccion",
+        ],
     }
     
     def __init__(self, default_type: QueryType = QueryType.FACTUAL):
@@ -245,24 +262,61 @@ Desarrolla la matemática paso a paso, citando las fuentes.""",
                 self._compressor = False  # Marker para no reintentar
         return self._compressor if self._compressor else None
     
+    @staticmethod
+    def _strip_accents(text: str) -> str:
+        """Elimina acentos/diacríticos de un texto."""
+        nfkd = unicodedata.normalize("NFKD", text)
+        return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+    @staticmethod
+    def _format_citation(result: RetrievalResult) -> str:
+        """
+        Formatea una cita rica usando metadatos de sección si están disponibles.
+
+        Ejemplos de output:
+        - "Nielsen & Chuang — Chapter 5 > Quantum Fourier Transform — §5.2.1"
+        - "Preskill Notes — Entanglement" (fallback si no hay section metadata)
+
+        Args:
+            result: Resultado de retrieval con metadata
+
+        Returns:
+            Cita formateada legible para humanos
+        """
+        parts = [result.doc_title]
+
+        metadata = result.metadata or {}
+
+        # Usar section_hierarchy si está disponible
+        section_hierarchy = metadata.get("section_hierarchy", [])
+        if section_hierarchy:
+            # Tomar los primeros 2 niveles de jerarquía
+            hierarchy_str = " > ".join(section_hierarchy[:2])
+            parts.append(hierarchy_str)
+        elif result.header_path:
+            # Fallback a header_path si no hay jerarquía
+            parts.append(result.header_path)
+
+        # Añadir número de sección si está disponible
+        section_number = metadata.get("section_number", "")
+        if section_number:
+            parts.append(f"§{section_number}")
+
+        return " — ".join(parts)
+
     def detect_query_type(self, query: str) -> QueryType:
         """
         Detecta el tipo de consulta basándose en palabras clave.
-        
-        Args:
-            query: Consulta del usuario
-            
-        Returns:
-            Tipo de query detectado
+        Normaliza acentos para mayor robustez.
         """
-        query_lower = query.lower()
-        
+        query_norm = self._strip_accents(query.lower())
+
         for query_type, keywords in self.QUERY_KEYWORDS.items():
             for keyword in keywords:
-                if keyword in query_lower:
+                if keyword in query_norm:
                     logger.debug(f"Query type detected: {query_type.value} (keyword: {keyword})")
                     return query_type
-        
+
         return self.default_type
     
     def build_prompt(
@@ -300,17 +354,24 @@ Desarrolla la matemática paso a paso, citando las fuentes.""",
         total_tokens = 0
         
         for result in results:
-            # Estimar tokens (aprox 4 chars/token)
-            chunk_tokens = len(result.content) // 4
-            
+            # Estimar tokens (~3 chars/token, más preciso para español)
+            chunk_tokens = len(result.content) // 3
+
             if total_tokens + chunk_tokens > max_context_tokens:
                 break
-            
+
             if include_metadata:
-                context = f"[Fuente: {result.doc_title} | {result.header_path}]\n{result.content}"
+                # Usar cita rica con metadatos de sección si disponibles
+                citation = self._format_citation(result)
+                context = f"[Fuente: {citation}]\n{result.content}"
+
+                # Añadir topic_summary si está disponible para contexto extra
+                topic_summary = result.metadata.get("topic_summary", "") if result.metadata else ""
+                if topic_summary:
+                    context = f"[Fuente: {citation}]\n[Tema: {topic_summary}]\n{result.content}"
             else:
                 context = result.content
-            
+
             contexts.append(context)
             total_tokens += chunk_tokens
         

@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 import re
-import os
 
 from ..retrieval.fusion import RetrievalResult
 from ..generation.synthesizer import GeneratedResponse
@@ -88,19 +87,15 @@ class ResponseCritic:
     def __init__(
         self,
         use_llm_critic: bool = False,
-        llm_model: str = "gpt-4o-mini",
         strict_mode: bool = False
     ):
         """
         Args:
             use_llm_critic: Si usar LLM para crítica
-            llm_model: Modelo para crítica
             strict_mode: Si ser estricto con alucinaciones
         """
         self.use_llm_critic = use_llm_critic
-        self.llm_model = llm_model
         self.strict_mode = strict_mode
-        self._llm_client = None
     
     def critique(
         self,
@@ -383,14 +378,14 @@ class ResponseCritic:
         query: str
     ) -> Dict[str, Any]:
         """Crítica usando LLM."""
-        self._init_llm()
-        
+        from src.llm_provider import complete as llm_complete
+
         # Preparar contexto de fuentes
         sources_text = "\n\n".join(
-            f"[{i+1}] {s.content[:500]}..." 
+            f"[{i+1}] {s.content[:500]}..."
             for i, s in enumerate(sources[:5])
         )
-        
+
         prompt = f"""Evalúa esta respuesta RAG por calidad y precisión.
 
 PREGUNTA: {query}
@@ -419,18 +414,13 @@ Responde en JSON:
     ],
     "suggestions": ["..."]
 }}"""
-        
+
         try:
-            response = self._llm_client.chat.completions.create(
-                model=self.llm_model,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-                temperature=0.1
-            )
-            
+            response = llm_complete(prompt=prompt, json_mode=True, temperature=0.1)
+
             import json
-            result = json.loads(response.choices[0].message.content)
-            
+            result = json.loads(response.content)
+
             # Convertir a CritiqueIssue
             issues = []
             type_mapping = {
@@ -438,10 +428,10 @@ Responde en JSON:
                 "missing": CritiqueCategory.INCOMPLETE,
                 "inconsistent": CritiqueCategory.INCONSISTENT
             }
-            
+
             for i in result.get("issues", []):
                 category = type_mapping.get(
-                    i.get("type", ""), 
+                    i.get("type", ""),
                     CritiqueCategory.QUALITY
                 )
                 issues.append(CritiqueIssue(
@@ -450,27 +440,15 @@ Responde en JSON:
                     description=i.get("description", ""),
                     suggestion=i.get("suggestion")
                 ))
-            
+
             return {
                 "issues": issues,
                 "suggestions": result.get("suggestions", [])
             }
-            
+
         except Exception as e:
             logger.warning(f"LLM critique failed: {e}")
             return {"issues": [], "suggestions": []}
-    
-    def _init_llm(self):
-        """Inicializa cliente LLM."""
-        if self._llm_client is not None:
-            return
-        
-        from openai import OpenAI
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY no configurada")
-        
-        self._llm_client = OpenAI(api_key=api_key)
 
 
 class IterativeRefiner:
@@ -526,11 +504,43 @@ class IterativeRefiner:
                 query
             )
             
-            # Regenerar con feedback
-            # Nota: esto requeriría modificar el synthesizer
-            # para aceptar un prompt de refinamiento
+            # Regenerar con feedback usando LLM directamente
             logger.info(f"Iteración {iteration + 1}: score={critique.overall_score:.2f}")
-        
+
+            try:
+                from src.llm_provider import complete as llm_complete
+
+                llm_response = llm_complete(
+                    prompt=refinement_prompt,
+                    system=(
+                        "Eres un experto en computación cuántica y matemáticas. "
+                        "Mejora la respuesta abordando los problemas detectados. "
+                        "Mantén las citas a fuentes y la precisión técnica."
+                    ),
+                    temperature=0.2,
+                    max_tokens=2000,
+                )
+
+                current_response = GeneratedResponse(
+                    content=llm_response.content,
+                    query=query,
+                    query_type=current_response.query_type,
+                    sources_used=current_response.sources_used,
+                    model=llm_response.model,
+                    tokens_input=llm_response.tokens_input,
+                    tokens_output=llm_response.tokens_output,
+                    latency_ms=current_response.latency_ms,
+                    metadata={
+                        **current_response.metadata,
+                        "refinement_iteration": iteration + 1,
+                        "pre_refinement_score": critique.overall_score,
+                    },
+                )
+
+            except Exception as e:
+                logger.warning(f"Refinamiento fallido en iteración {iteration + 1}: {e}")
+                break
+
         return current_response
     
     def _create_refinement_prompt(

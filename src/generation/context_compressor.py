@@ -121,8 +121,8 @@ class ContextCompressor:
     
     def _estimate_tokens(self, text: str) -> int:
         """Estima el número de tokens (aproximación)."""
-        # Regla general: ~4 caracteres por token en inglés/español
-        return len(text) // 4
+        # Regla general: ~3 caracteres por token (más preciso para español)
+        return len(text) // 3
     
     def _extract_preserved_elements(self, text: str) -> Tuple[str, Dict[str, List[str]]]:
         """

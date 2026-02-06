@@ -124,8 +124,8 @@ class TestContextCompressor:
         tokens = compressor._estimate_tokens(text)
         
         assert tokens > 0
-        # Aproximadamente 4 chars por token
-        assert tokens == len(text) // 4
+        # Aproximadamente 3 chars por token (más preciso para español)
+        assert tokens == len(text) // 3
     
     def test_compress_empty_text(self, compressor):
         """Test de compresión de texto vacío."""

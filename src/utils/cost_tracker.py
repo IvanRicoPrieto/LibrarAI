@@ -6,6 +6,7 @@ Separa costes de indexación (build) de consultas (query).
 """
 
 import csv
+import logging
 import os
 from pathlib import Path
 from datetime import datetime
@@ -13,6 +14,8 @@ from dataclasses import dataclass
 from typing import Optional, Literal, Union
 from enum import Enum
 import threading
+
+logger = logging.getLogger(__name__)
 
 
 class UsageType(Enum):
@@ -80,6 +83,10 @@ class CostTracker:
         "claude-3-5-haiku-20241022": {"input": 0.0008, "output": 0.004},
         "claude-3-opus-20240229": {"input": 0.015, "output": 0.075},
         
+        # Claude Max (suscripcion tarifa plana, coste 0 por token)
+        "claude-opus-4-5-20251101": {"input": 0.0, "output": 0.0},
+        "claude-haiku-4-5-20251001": {"input": 0.0, "output": 0.0},
+
         # Ollama (gratis, coste local)
         "llama3.2": {"input": 0.0, "output": 0.0},
         "mistral": {"input": 0.0, "output": 0.0},
@@ -141,6 +148,11 @@ class CostTracker:
     
     def get_pricing(self, model: str) -> dict:
         """Obtiene precios para un modelo."""
+        if model not in self.PRICING:
+            logger.warning(
+                f"Modelo '{model}' no encontrado en tabla de precios. "
+                f"Usando coste $0. Añádelo a CostTracker.PRICING si es de pago."
+            )
         return self.PRICING.get(model, {"input": 0.0, "output": 0.0})
     
     def calculate_cost(

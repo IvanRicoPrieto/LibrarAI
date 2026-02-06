@@ -146,53 +146,27 @@ class RAGASEvaluator:
     def __init__(
         self,
         config: Optional[EvaluationConfig] = None,
-        llm_client: Optional[object] = None,
     ):
         """
         Initialize evaluator.
-        
+
         Args:
             config: Evaluation configuration
-            llm_client: Optional pre-configured LLM client
         """
         self.config = config or EvaluationConfig()
-        self._llm_client = llm_client
-        self._initialized = False
-    
-    def _get_llm_client(self):
-        """Lazy initialization of LLM client."""
-        if self._llm_client is not None:
-            return self._llm_client
-            
-        if not self._initialized:
-            try:
-                from openai import OpenAI
-                self._llm_client = OpenAI()
-                self._initialized = True
-            except ImportError:
-                raise ImportError(
-                    "openai package required for evaluation. "
-                    "Install with: pip install openai"
-                )
-        return self._llm_client
-    
+
     def _call_llm(self, prompt: str, system: str = "") -> str:
         """Call LLM for evaluation."""
-        client = self._get_llm_client()
-        
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-        
-        response = client.chat.completions.create(
-            model=self.config.eval_model,
-            messages=messages,
+        from src.llm_provider import complete as llm_complete
+
+        response = llm_complete(
+            prompt=prompt,
+            system=system or None,
             temperature=self.config.temperature,
             max_tokens=1000,
         )
-        
-        return response.choices[0].message.content
+
+        return response.content
     
     def _evaluate_faithfulness(
         self,
