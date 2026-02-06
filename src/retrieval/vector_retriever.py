@@ -186,32 +186,49 @@ class VectorRetriever:
         top_k: int = 10,
         score_threshold: float = 0.5,
         filters: Optional[Dict[str, Any]] = None,
-        auto_merge: bool = True
+        auto_merge: bool = True,
+        difficulty_level: Optional[str] = None,
+        math_aware: bool = False
     ) -> List[VectorSearchResult]:
         """
         Realiza búsqueda semántica.
-        
+
         Args:
             query: Consulta en lenguaje natural
             top_k: Número de resultados a retornar
             score_threshold: Umbral mínimo de similitud
             filters: Filtros de metadatos (doc_id, header_path, etc.)
             auto_merge: Si expandir chunks usando jerarquía
-            
+            difficulty_level: Filtrar por nivel de dificultad (introductory, intermediate, advanced, research)
+            math_aware: Si True, expande la query con términos matemáticos equivalentes
+
         Returns:
             Lista de resultados ordenados por relevancia
         """
         self._init_qdrant()
-        
+
+        # Math-aware: expandir query con términos matemáticos
+        effective_query = query
+        if math_aware:
+            try:
+                from ..ingestion.math_extractor import normalize_math_query
+                effective_query = normalize_math_query(query)
+                if effective_query != query:
+                    logger.debug(f"Math-aware query expansion: '{query}' -> '{effective_query}'")
+            except ImportError:
+                pass  # Si no está disponible, usar query original
+
         # Generar embedding de la query
-        query_embedding = self._get_embedding(query)
+        query_embedding = self._get_embedding(effective_query)
         
         # Construir filtros para Qdrant
         qdrant_filter = None
+        from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
+
+        conditions = []
+
+        # Filtros generales pasados por el usuario
         if filters:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
-            
-            conditions = []
             for key, value in filters.items():
                 conditions.append(
                     FieldCondition(
@@ -219,6 +236,27 @@ class VectorRetriever:
                         match=MatchValue(value=value)
                     )
                 )
+
+        # Filtro por nivel de dificultad
+        if difficulty_level:
+            # Soportar múltiples niveles separados por coma
+            if "," in difficulty_level:
+                levels = [l.strip() for l in difficulty_level.split(",")]
+                conditions.append(
+                    FieldCondition(
+                        key="difficulty_level",
+                        match=MatchAny(any=levels)
+                    )
+                )
+            else:
+                conditions.append(
+                    FieldCondition(
+                        key="difficulty_level",
+                        match=MatchValue(value=difficulty_level)
+                    )
+                )
+
+        if conditions:
             qdrant_filter = Filter(must=conditions)
         
         # Búsqueda usando query_points (qdrant-client 1.16+)

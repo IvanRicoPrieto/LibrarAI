@@ -76,27 +76,14 @@ retrieval:
 # -----------------------------------------------------------------------------
 # Configuración de Generación
 # -----------------------------------------------------------------------------
+# NOTA: El proveedor LLM para chat completions se controla via la variable
+# de entorno LLM_PROVIDER (ver .env). Default: claude_max (tarifa plana).
+# Opciones: claude_max, openai_api, anthropic_api
+# Los parámetros de generación (temperature, max_tokens) se usan aquí.
 generation:
-  provider: "anthropic" # opciones: "anthropic", "openai", "local"
-  model: "claude-sonnet-4-5-20250929" # Claude Sonnet 4.5
   temperature: 0.3
   max_tokens: 2000
-
-  # Alternativas
-  openai:
-    model: "gpt-4.1"
-  local:
-    model: "llama-3.3-70b"
-    base_url: "http://localhost:8000/v1"
-
-# -----------------------------------------------------------------------------
-# Configuración de Ruteo/Planning
-# -----------------------------------------------------------------------------
-routing:
-  provider: "openai"
-  model: "gpt-4.1-mini"
-  temperature: 0.1
-  max_tokens: 500
+  context_budget: 16000  # Presupuesto de tokens para contexto (antes: 4000)
 
 # -----------------------------------------------------------------------------
 # Configuración de Verificación (Critic)
@@ -107,11 +94,83 @@ verification:
   max_unsupported_claims: 2 # Máximo de afirmaciones sin soporte antes de abstención
 
 # -----------------------------------------------------------------------------
+# Contextual Retrieval (prepend context prefix a embeddings)
+# -----------------------------------------------------------------------------
+contextual_retrieval:
+  enabled: false  # Activar con --contextual en ingest_library
+  max_context_tokens: 100  # Máximo tokens para el prefijo de contexto
+  batch_size: 20  # Chunks por batch LLM
+
+# -----------------------------------------------------------------------------
+# Proposition-based Indexing (proposiciones atómicas)
+# -----------------------------------------------------------------------------
+proposition_indexing:
+  enabled: false  # Activar con --propositions en ingest_library
+  max_propositions_per_chunk: 10
+  min_proposition_tokens: 10
+  batch_size: 5
+  collection_name: "quantum_library_propositions"
+
+# -----------------------------------------------------------------------------
+# Section Extraction (extracción LLM de jerarquía de secciones)
+# -----------------------------------------------------------------------------
+section_extraction:
+  enabled: false  # Activar con --section-extraction en ingest_library
+  batch_size: 10  # Chunks por batch LLM
+  include_topic_summary: true  # Generar resumen de tema por chunk
+
+# -----------------------------------------------------------------------------
+# Context Expansion (expansión LLM de contexto coherente)
+# -----------------------------------------------------------------------------
+context_expansion:
+  enabled: true  # Usado en ask_library con --export-context
+  chunks_before: 3  # Chunks a incluir antes del central
+  chunks_after: 3  # Chunks a incluir después del central
+  max_context_tokens: 2000  # Máximo tokens para contexto extendido
+
+# -----------------------------------------------------------------------------
+# Corrective RAG (validación pre-generación)
+# -----------------------------------------------------------------------------
+corrective_rag:
+  enabled: false  # Activar con --crag en ask_library
+  use_llm: true  # Usar LLM para evaluación (false = heurístico keyword overlap)
+  correct_threshold: 0.7  # Umbral para clasificar como CORRECT
+  incorrect_threshold: 0.3  # Umbral para clasificar como INCORRECT
+  majority_threshold: 0.5  # Proporción de INCORRECT para reformular
+
+# -----------------------------------------------------------------------------
+# Agentic RAG (loop iterativo Retrieve→Reflect→Decide)
+# -----------------------------------------------------------------------------
+agentic_rag:
+  enabled: false  # Activar con --agentic en ask_library
+  max_iterations: 4
+  confidence_threshold: 0.7  # Confianza mínima para considerar suficiente
+  min_new_results: 2  # Mínimo de nuevos resultados para continuar iterando
+
+# -----------------------------------------------------------------------------
+# Fine-tuning de Embeddings (tooling)
+# -----------------------------------------------------------------------------
+finetuning:
+  queries_per_chunk: 3
+  min_chunk_tokens: 50
+  hard_negatives_per_pair: 3
+  openai_base_model: "text-embedding-3-large"
+  default_epochs: 3
+  val_fraction: 0.1
+
+# -----------------------------------------------------------------------------
 # Configuración del Grafo de Conocimiento
 # -----------------------------------------------------------------------------
 knowledge_graph:
   enabled: true
   storage: "networkx" # opciones: "networkx", "neo4j"
+
+  # Extracción de entidades
+  extraction:
+    method: "regex"  # opciones: "regex", "llm"
+    llm_sample_rate: 0.1  # Fracción de chunks para LLM (si method=llm)
+    llm_batch_size: 5  # Chunks por batch LLM
+    min_confidence: 0.7  # Confianza mínima para triples LLM
 
   # Para Neo4j (si se usa)
   neo4j:
@@ -180,3 +239,119 @@ cli:
   show_cost: true
   show_time: true
   output_format: "markdown" # "markdown", "plain", "json"
+
+# -----------------------------------------------------------------------------
+# Multi-Query RAG (expansión de queries)
+# -----------------------------------------------------------------------------
+multi_query:
+  enabled: false  # Activar con --multi-query en ask_library
+  n_variations: 4  # Número de variaciones de query a generar
+  strategy: "all"  # paraphrase, decompose, keyword_expand, perspective, all
+  use_llm: true  # Usar LLM para expansión (false = heurísticas)
+
+# -----------------------------------------------------------------------------
+# Self-RAG (RAG auto-reflexivo)
+# -----------------------------------------------------------------------------
+self_rag:
+  enabled: false  # Activar con --self-rag en ask_library
+  max_iterations: 3  # Máximo de iteraciones de refinamiento
+  min_relevance_ratio: 0.5  # Ratio mínimo de contextos relevantes
+  require_support: true  # Exigir que respuesta esté fundamentada
+
+# -----------------------------------------------------------------------------
+# ColBERT (Late Interaction retrieval)
+# -----------------------------------------------------------------------------
+colbert:
+  enabled: false  # Activar con --colbert en ingest/ask
+  model_name: "colbert-ir/colbertv2.0"
+  use_gpu: false
+  use_for_reranking: true  # Usar para re-rankear en lugar de indexar
+
+# -----------------------------------------------------------------------------
+# SPLADE (Learned Sparse representations)
+# -----------------------------------------------------------------------------
+splade:
+  enabled: false  # Activar con --splade en ingest/ask
+  model_name: "naver/splade-cocondenser-ensembledistil"
+  max_length: 256
+  top_k_tokens: 256  # Tokens sparse por documento
+
+# -----------------------------------------------------------------------------
+# Hierarchical Summarization Index
+# -----------------------------------------------------------------------------
+hierarchical_index:
+  enabled: false  # Activar con --hierarchical en ingest_library
+  generate_summaries: true  # Generar resúmenes con LLM
+  top_docs_routing: 3  # Documentos top para routing
+  top_sections_routing: 5  # Secciones top para routing
+
+# -----------------------------------------------------------------------------
+# Citation Grounding (citas verificables)
+# -----------------------------------------------------------------------------
+citation_grounding:
+  enabled: false  # Activar con --grounded en ask_library
+  min_grounding_score: 0.8  # Score mínimo de grounding aceptable
+  require_all_cited: true  # Exigir cita para toda afirmación
+  use_llm_verification: true  # Usar LLM para verificar (false = heurístico)
+  max_retries: 2  # Intentos de regeneración si grounding insuficiente
+
+# -----------------------------------------------------------------------------
+# Agent API (API optimizada para agentes IA)
+# -----------------------------------------------------------------------------
+# Esta API está diseñada para consumo programático por agentes como Claude Code.
+# Todos los outputs son JSON estructurado con tipos bien definidos.
+#
+# Modos disponibles (CLI: python -m src.cli.librari <mode>):
+#   - explore: Descubrir qué contenido existe sobre un tema
+#   - retrieve: Obtener contenido exhaustivo (no limitado a top-k)
+#   - query: Responder preguntas con citas verificables
+#   - verify: Verificar afirmaciones contra las fuentes
+#   - cite: Generar citas formateadas en varios estilos
+#
+# Uso desde código:
+#   from src.api import AgentAPI
+#   api = AgentAPI(indices_dir=Path("indices"))
+#   result = api.explore("algoritmo de Shor")
+#   print(result.to_json())
+#
+agent_api:
+  enabled: true
+  default_exhaustive_limit: 100  # Límite por defecto en modo exhaustivo
+  expand_context: true  # Expandir chunks a contexto coherente
+  citation_styles:
+    - apa
+    - ieee
+    - chicago
+    - markdown
+    - inline
+
+# -----------------------------------------------------------------------------
+# Difficulty Tagging (clasificación de nivel de dificultad)
+# -----------------------------------------------------------------------------
+# Clasifica chunks en 4 niveles para filtrado por nivel del estudiante:
+#   - introductory: Conceptos básicos, definiciones simples
+#   - intermediate: Teoremas, demostraciones simples
+#   - advanced: Matemáticas complejas, demostraciones rigurosas
+#   - research: Papers, resultados de vanguardia
+#
+# Uso: python -m src.cli.ingest_library --tag-difficulty
+# Filtrar: python -m src.cli.librari retrieve "tema" --level intermediate
+#
+difficulty_tagging:
+  enabled: false  # Activar con --tag-difficulty en ingest_library
+  use_llm: false  # Usar LLM para clasificación (más preciso, con coste)
+  batch_size: 20  # Chunks por batch si usa LLM
+
+# -----------------------------------------------------------------------------
+# Math Extraction (términos matemáticos para búsqueda)
+# -----------------------------------------------------------------------------
+# Extrae términos matemáticos de fórmulas LaTeX para mejorar búsqueda.
+# Convierte $\sum_{i=1}^n$ a ["sumatorio", "summation", "sum"]
+#
+# Uso: python -m src.cli.ingest_library --extract-math
+# Buscar: python -m src.cli.librari retrieve "integral" --math-aware
+#
+math_extraction:
+  enabled: false  # Activar con --extract-math en ingest_library
+  include_symbols: true  # Incluir símbolos griegos en términos
+  max_terms_per_chunk: 50  # Máximo términos por chunk

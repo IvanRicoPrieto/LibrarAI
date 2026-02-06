@@ -25,6 +25,7 @@ class RetrieverType(Enum):
     VECTOR = "vector"
     BM25 = "bm25"
     GRAPH = "graph"
+    PROPOSITION = "proposition"
 
 
 @dataclass
@@ -319,7 +320,8 @@ class UnifiedRetriever:
         reranker_preset: str = "balanced",  # "fast", "balanced", "quality", "max_quality"
         use_cache: bool = True,
         use_hyde: bool = False,
-        hyde_domain: str = "quantum_computing"
+        hyde_domain: str = "quantum_computing",
+        use_propositions: bool = False
     ):
         """
         Args:
@@ -333,30 +335,42 @@ class UnifiedRetriever:
             use_cache: Si usar cache de embeddings
             use_hyde: Si usar HyDE para expandir queries
             hyde_domain: Dominio para generación de documentos hipotéticos
+            use_propositions: Si usar retriever de proposiciones atómicas
         """
         from pathlib import Path
         from .vector_retriever import VectorRetriever
         from .bm25_retriever import BM25Retriever
         from .graph_retriever import GraphRetriever
-        
+
         self.indices_dir = Path(indices_dir)
         self.use_graph = use_graph
         self.use_reranker = use_reranker
         self.use_cache = use_cache
         self.use_hyde = use_hyde
         self.hyde_domain = hyde_domain
-        
+        self.use_propositions = use_propositions
+
         # Inicializar retrievers
         self.vector_retriever = VectorRetriever(self.indices_dir, use_cache=use_cache)
         self.bm25_retriever = BM25Retriever(self.indices_dir)
         self.graph_retriever = GraphRetriever(self.indices_dir) if use_graph else None
-        
+
+        # Inicializar proposition retriever si está habilitado
+        self.proposition_retriever = None
+        if use_propositions:
+            try:
+                from .proposition_retriever import PropositionRetriever
+                self.proposition_retriever = PropositionRetriever(self.indices_dir)
+                logger.info("PropositionRetriever inicializado")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar PropositionRetriever: {e}")
+
         # Inicializar HyDE expander si está habilitado
         self.hyde_expander = None
         if use_hyde:
             from .hyde import get_hyde_expander
             self.hyde_expander = get_hyde_expander()
-        
+
         # Fusión con reranker opcional
         self.fusion = HybridFusion(
             vector_weight=vector_weight,
@@ -378,11 +392,15 @@ class UnifiedRetriever:
         graph_top_k: int = 10,
         filters: Optional[Dict] = None,
         context_hint: Optional[str] = None,
-        dynamic_weights: Optional[Dict[str, float]] = None
+        dynamic_weights: Optional[Dict[str, float]] = None,
+        difficulty_level: Optional[str] = None,
+        math_aware: bool = False,
+        vector_only: bool = False,
+        bm25_only: bool = False
     ) -> List[RetrievalResult]:
         """
         Realiza búsqueda híbrida con re-ranking opcional y HyDE.
-        
+
         Args:
             query: Consulta en lenguaje natural
             top_k: Número de resultados finales
@@ -392,7 +410,11 @@ class UnifiedRetriever:
             filters: Filtros opcionales
             context_hint: Contexto adicional para HyDE
             dynamic_weights: Pesos dinámicos desde router {"vector": 0.5, "bm25": 0.3, "graph": 0.2}
-            
+            difficulty_level: Filtrar por nivel de dificultad (introductory, intermediate, advanced, research)
+            math_aware: Si True, expande query con términos matemáticos equivalentes
+            vector_only: Si True, solo usa búsqueda vectorial
+            bm25_only: Si True, solo usa búsqueda BM25
+
         Returns:
             Resultados fusionados y ordenados (re-rankeados si está habilitado)
         """
@@ -421,46 +443,54 @@ class UnifiedRetriever:
                 logging.warning(f"HyDE expansion failed, falling back to original query: {e}")
         
         # Búsqueda vectorial (con HyDE si está habilitado)
-        if hyde_texts:
-            # Búsqueda multi-query con pesos
-            all_vector_results = []
-            for text, weight in hyde_texts:
-                results = self.vector_retriever.search(
-                    text,
+        vector_results = []
+        if not bm25_only:
+            if hyde_texts:
+                # Búsqueda multi-query con pesos
+                all_vector_results = []
+                for text, weight in hyde_texts:
+                    results = self.vector_retriever.search(
+                        text,
+                        top_k=vector_top_k,
+                        filters=filters,
+                        difficulty_level=difficulty_level,
+                        math_aware=math_aware
+                    )
+                    # Ajustar scores por peso
+                    for r in results:
+                        r.score *= weight
+                    all_vector_results.extend(results)
+
+                # Deduplicar y promediar scores
+                seen = {}
+                for r in all_vector_results:
+                    if r.chunk_id in seen:
+                        # Promediar score
+                        seen[r.chunk_id].score = (seen[r.chunk_id].score + r.score) / 2
+                    else:
+                        seen[r.chunk_id] = r
+
+                vector_results = sorted(seen.values(), key=lambda x: x.score, reverse=True)[:vector_top_k]
+            else:
+                vector_results = self.vector_retriever.search(
+                    search_query,
                     top_k=vector_top_k,
-                    filters=filters
+                    filters=filters,
+                    difficulty_level=difficulty_level,
+                    math_aware=math_aware
                 )
-                # Ajustar scores por peso
-                for r in results:
-                    r.score *= weight
-                all_vector_results.extend(results)
-            
-            # Deduplicar y promediar scores
-            seen = {}
-            for r in all_vector_results:
-                if r.chunk_id in seen:
-                    # Promediar score
-                    seen[r.chunk_id].score = (seen[r.chunk_id].score + r.score) / 2
-                else:
-                    seen[r.chunk_id] = r
-            
-            vector_results = sorted(seen.values(), key=lambda x: x.score, reverse=True)[:vector_top_k]
-        else:
-            vector_results = self.vector_retriever.search(
-                search_query,
-                top_k=vector_top_k,
-                filters=filters
-            )
         
         # Búsqueda BM25 (siempre usa query original para keyword matching)
-        bm25_results = self.bm25_retriever.search(
-            query,
-            top_k=bm25_top_k
-        )
-        
+        bm25_results = []
+        if not vector_only:
+            bm25_results = self.bm25_retriever.search(
+                query,
+                top_k=bm25_top_k
+            )
+
         # Búsqueda en grafo
         graph_results = None
-        if self.use_graph and self.graph_retriever:
+        if not vector_only and not bm25_only and self.use_graph and self.graph_retriever:
             graph_results = self.graph_retriever.search(
                 query,
                 top_k=graph_top_k
@@ -475,5 +505,28 @@ class UnifiedRetriever:
             query=query,  # Necesario para re-ranking
             dynamic_weights=dynamic_weights
         )
-        
+
+        # Buscar en proposiciones y merge si está habilitado
+        if self.use_propositions and self.proposition_retriever:
+            try:
+                prop_results = self.proposition_retriever.search(
+                    query, top_k=top_k, expand_to_parent=True
+                )
+                prop_retrieval = self.proposition_retriever.to_retrieval_results(prop_results)
+
+                # Merge sin duplicados
+                existing_ids = {r.chunk_id for r in results}
+                for pr in prop_retrieval:
+                    if pr.chunk_id not in existing_ids:
+                        existing_ids.add(pr.chunk_id)
+                        results.append(pr)
+
+                # Re-sort y limitar
+                results.sort(key=lambda x: x.score, reverse=True)
+                results = results[:top_k]
+
+                logger.info(f"Propositions: {len(prop_results)} encontradas, merge total: {len(results)}")
+            except Exception as e:
+                logger.warning(f"Error buscando proposiciones: {e}")
+
         return results

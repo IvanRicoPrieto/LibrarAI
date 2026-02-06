@@ -41,26 +41,38 @@ class Chunk:
     chunk_id: str
     content: str
     level: ChunkLevel
-    
+
     # Metadatos de ubicación
     doc_id: str
     doc_title: str
     header_path: str
-    
+
     # Jerarquía
     parent_id: Optional[str] = None
     children_ids: List[str] = field(default_factory=list)
-    
+
     # Posición en documento original
     start_char: int = 0
     end_char: int = 0
-    
+
     # Estadísticas
     token_count: int = 0
     char_count: int = 0
-    
+
     # Hash para deduplicación
     content_hash: str = field(default="")
+
+    # Metadata de sección enriquecida (extraída por LLM)
+    section_hierarchy: List[str] = field(default_factory=list)  # ["Capítulo 5", "5.2 Factorización"]
+    section_number: str = ""  # "5.2.1"
+    topic_summary: str = ""  # "Explicación del período cuántico"
+
+    # Nivel de dificultad (introductory, intermediate, advanced, research)
+    difficulty_level: str = "intermediate"
+    difficulty_confidence: float = 0.0  # Confianza en la clasificación (0-1)
+
+    # Términos matemáticos para búsqueda math-aware
+    math_terms: List[str] = field(default_factory=list)  # ["integral", "sumatorio", "eigenvalue"]
     
     def __post_init__(self):
         if not self.content_hash:
@@ -84,8 +96,26 @@ class Chunk:
             "end_char": self.end_char,
             "token_count": self.token_count,
             "char_count": self.char_count,
-            "content_hash": self.content_hash
+            "content_hash": self.content_hash,
+            "section_hierarchy": self.section_hierarchy,
+            "section_number": self.section_number,
+            "topic_summary": self.topic_summary,
+            "difficulty_level": self.difficulty_level,
+            "difficulty_confidence": self.difficulty_confidence,
+            "math_terms": self.math_terms,
         }
+
+    def format_citation(self) -> str:
+        """Formatea la ubicación para citas legibles."""
+        parts = [self.doc_title]
+        if self.section_hierarchy:
+            # Usar hasta 2 niveles de jerarquía
+            parts.append(" > ".join(self.section_hierarchy[:2]))
+        elif self.header_path:
+            parts.append(self.header_path)
+        if self.section_number:
+            parts.append(f"§{self.section_number}")
+        return " — ".join(parts)
 
 
 class HierarchicalChunker:
@@ -143,16 +173,20 @@ class HierarchicalChunker:
         # Contadores para IDs únicos
         self._chunk_counter = 0
         
-        # Cache de hashes para deduplicación
+        # Cache de hashes para deduplicación cross-documento
         self._seen_hashes: Set[str] = set()
-    
+
+    def reset_dedup_cache(self):
+        """Limpia la cache de deduplicación. Llamar con --force."""
+        self._seen_hashes.clear()
+
     def count_tokens(self, text: str) -> int:
         """Cuenta tokens en un texto."""
         if self.tokenizer:
             return len(self.tokenizer.encode(text))
         else:
-            # Estimación: ~4 caracteres por token en inglés/español
-            return len(text) // 4
+            # Estimación: ~3 caracteres por token (más preciso para español)
+            return len(text) // 3
     
     def chunk_document(self, document: ParsedDocument) -> List[Chunk]:
         """
@@ -165,8 +199,8 @@ class HierarchicalChunker:
             Lista de todos los chunks (todos los niveles)
         """
         all_chunks = []
-        self._seen_hashes.clear()
-        
+        # No limpiar _seen_hashes: permite deduplicación cross-documento
+
         for section in document.sections:
             section_chunks = self._chunk_section(section)
             all_chunks.extend(section_chunks)
@@ -276,19 +310,38 @@ class HierarchicalChunker:
         
         # Dividir por separadores
         parts = self._split_with_separators(text, target_size)
-        
+
+        prev_part = ""
         for part in parts:
             part = part.strip()
             if not part:
                 continue
-            
+
+            # Añadir overlap del chunk anterior (solo para MICRO)
+            if self.overlap > 0 and prev_part and level == ChunkLevel.MICRO:
+                overlap_text = self._get_overlap_tail(prev_part, self.overlap)
+                if overlap_text:
+                    part = overlap_text + "\n" + part
+
             part_tokens = self.count_tokens(part)
             chunk = self._create_chunk(
                 part, level, section, parent_id, part_tokens
             )
             chunks.append(chunk)
-        
+            prev_part = part
+
         return chunks
+
+    def _get_overlap_tail(self, text: str, overlap_tokens: int) -> str:
+        """Obtiene las últimas N tokens del texto como overlap."""
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        tail = ""
+        for sent in reversed(sentences):
+            candidate = (sent + " " + tail).strip() if tail else sent
+            if self.count_tokens(candidate) > overlap_tokens:
+                break
+            tail = candidate
+        return tail
     
     def _split_with_separators(
         self, 
@@ -323,8 +376,14 @@ class HierarchicalChunker:
             text
         )
         protected_text = re.sub(
-            r'\$\$[\s\S]*?\$\$', 
-            protect_block, 
+            r'\$\$[\s\S]*?\$\$',
+            protect_block,
+            protected_text
+        )
+        # Proteger inline LaTeX $...$ (sin partir fórmulas)
+        protected_text = re.sub(
+            r'\$[^\$\n]+\$',
+            protect_block,
             protected_text
         )
         

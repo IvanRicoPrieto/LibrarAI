@@ -30,6 +30,12 @@ from ..utils.cost_tracker import get_tracker, UsageType
 logger = logging.getLogger(__name__)
 
 
+def _chunk_id_to_qdrant_id(chunk_id: str) -> int:
+    """Deterministic, collision-resistant mapping from chunk_id to Qdrant int ID."""
+    digest = hashlib.sha256(chunk_id.encode("utf-8")).hexdigest()
+    return int(digest[:16], 16)
+
+
 @dataclass
 class DocumentManifest:
     """Registro de un documento indexado."""
@@ -104,13 +110,20 @@ class LibraryIndexer:
         indices_dir: Path,
         embedding_provider: str = "openai",
         embedding_model: str = "text-embedding-3-large",
-        embedding_dimensions: int = 1536,
+        embedding_dimensions: int = 3072,
         qdrant_collection: str = "quantum_library",
         use_graph: bool = True,
         qdrant_url: str = None,
         use_semantic_chunking: bool = False,
         parallel_workers: int = 4,
-        parallel_batch_size: int = 50
+        parallel_batch_size: int = 50,
+        describe_images: bool = False,
+        use_contextual_retrieval: bool = False,
+        use_propositions: bool = False,
+        use_section_extraction: bool = False,
+        tag_difficulty: bool = False,
+        extract_math_terms: bool = False,
+        difficulty_use_llm: bool = False
     ):
         """
         Args:
@@ -124,10 +137,17 @@ class LibraryIndexer:
             use_semantic_chunking: Si usar chunking semántico adaptativo
             parallel_workers: Número de workers para embeddings paralelos (default: 4)
             parallel_batch_size: Tamaño de batch por worker (default: 50)
+            describe_images: Si True, describe imágenes con vision LLM
+            use_contextual_retrieval: Si True, genera prefijos de contexto LLM para embeddings
+            use_propositions: Si True, descompone chunks en proposiciones atómicas
+            use_section_extraction: Si True, extrae jerarquía de secciones con LLM para citas precisas
+            tag_difficulty: Si True, clasifica nivel de dificultad de cada chunk
+            extract_math_terms: Si True, extrae términos matemáticos para búsqueda math-aware
+            difficulty_use_llm: Si True, usa LLM para clasificar dificultad (más preciso, con coste)
         """
         self.indices_dir = Path(indices_dir)
         self.indices_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.embedding_provider = embedding_provider
         self.embedding_model = embedding_model
         self.embedding_dimensions = embedding_dimensions
@@ -137,6 +157,12 @@ class LibraryIndexer:
         self.use_semantic_chunking = use_semantic_chunking
         self.parallel_workers = parallel_workers
         self.parallel_batch_size = parallel_batch_size
+        self.use_contextual_retrieval = use_contextual_retrieval
+        self.use_propositions = use_propositions
+        self.use_section_extraction = use_section_extraction
+        self.tag_difficulty = tag_difficulty
+        self.extract_math_terms = extract_math_terms
+        self.difficulty_use_llm = difficulty_use_llm
         
         # Rutas de archivos
         self.manifest_path = self.indices_dir / "manifest.json"
@@ -153,6 +179,9 @@ class LibraryIndexer:
         
         # Parser y chunker
         self.parser = MarkdownParser()
+        if describe_images:
+            self.parser.set_image_describer(self.indices_dir)
+            logger.info("Descripción de imágenes habilitada (vision LLM)")
         if use_semantic_chunking:
             from .semantic_chunker import SemanticChunker
             self.chunker = SemanticChunker()
@@ -256,10 +285,33 @@ class LibraryIndexer:
                 )
                 raise
     
+    def _truncate_for_embedding(self, text: str, max_tokens: int = 8191) -> str:
+        """Trunca texto si excede el límite de tokens del modelo de embedding."""
+        try:
+            import tiktoken
+            enc = tiktoken.get_encoding("cl100k_base")
+            tokens = enc.encode(text)
+            if len(tokens) > max_tokens:
+                logger.warning(
+                    f"Texto truncado para embedding: {len(tokens)} → {max_tokens} tokens"
+                )
+                return enc.decode(tokens[:max_tokens])
+        except ImportError:
+            # Fallback: estimar ~3 chars/token
+            estimated = len(text) // 3
+            if estimated > max_tokens:
+                char_limit = max_tokens * 3
+                logger.warning(
+                    f"Texto truncado para embedding: ~{estimated} → ~{max_tokens} tokens"
+                )
+                return text[:char_limit]
+        return text
+
     def _get_embedding(self, text: str) -> List[float]:
         """Genera embedding para un texto."""
         self._init_embeddings()
-        
+        text = self._truncate_for_embedding(text)
+
         if self.embedding_provider == "openai":
             response = self._embedding_client.embeddings.create(
                 input=text,
@@ -424,9 +476,10 @@ class LibraryIndexer:
             logger.error("rank_bm25 no instalado. Ejecuta: pip install rank-bm25")
             raise
         
-        # Tokenizar documentos (simple split)
+        # Tokenizar documentos (con limpieza de stopwords y puntuación)
+        from ..utils.text_processing import tokenize_for_bm25
         tokenized_corpus = [
-            chunk.content.lower().split() 
+            tokenize_for_bm25(chunk.content)
             for chunk in chunks
         ]
         
@@ -512,6 +565,9 @@ class LibraryIndexer:
         self._init_qdrant()
         self._load_chunks_store()
         self._init_graph()
+
+        if force:
+            self.chunker.reset_dedup_cache()
         
         # Encontrar archivos Markdown
         md_files = list(markdown_dir.rglob("*.md"))
@@ -535,6 +591,18 @@ class LibraryIndexer:
                             stats["documents_skipped"] += 1
                             continue
                 
+                # Eliminar vectores viejos si el doc ya estaba indexado
+                if relative_path in self.manifest.documents:
+                    old_doc_id = self.manifest.documents[relative_path].doc_id
+                    self._remove_document_vectors(old_doc_id)
+                    # Limpiar chunks viejos del store
+                    old_chunk_ids = [
+                        cid for cid, c in self._chunks_store.items()
+                        if c.doc_id == old_doc_id
+                    ]
+                    for cid in old_chunk_ids:
+                        del self._chunks_store[cid]
+
                 # Parsear y chunkear
                 doc = self.parser.parse_file(file_path)
                 chunks = self.chunker.chunk_document(doc)
@@ -605,59 +673,103 @@ class LibraryIndexer:
         return stats
     
     def _index_chunks_to_qdrant(
-        self, 
-        chunks: List[Chunk], 
+        self,
+        chunks: List[Chunk],
         file_paths: Dict[str, str] = None,
         use_parallel: bool = True
     ):
         """
         Indexa chunks en Qdrant.
-        
+
         Args:
             chunks: Lista de chunks a indexar
             file_paths: Diccionario doc_id -> file_path para extraer categoría
             use_parallel: Si usar embeddings paralelos
         """
         from qdrant_client.models import PointStruct
-        
-        # Generar embeddings (paralelo o secuencial)
-        texts = [c.content for c in chunks]
+
+        # Difficulty Tagging: clasificar nivel de dificultad
+        if self.tag_difficulty:
+            self._tag_difficulty_levels(chunks)
+
+        # Math Terms Extraction: extraer términos matemáticos
+        if self.extract_math_terms:
+            self._extract_math_terms(chunks)
+
+        # Section Extraction: extraer jerarquía de secciones con LLM
+        if self.use_section_extraction:
+            self._extract_section_metadata(chunks)
+
+        # Contextual Retrieval: generar prefijos de contexto antes de embedding
+        context_map: Dict[str, str] = {}  # chunk_id -> context_prefix
+        if self.use_contextual_retrieval:
+            context_map = self._generate_chunk_contexts(chunks)
+
+        # Generar textos para embedding (con o sin contexto)
+        texts = []
+        for c in chunks:
+            if c.chunk_id in context_map:
+                # Usar texto contextualizado para embedding
+                prefix = context_map[c.chunk_id]
+                texts.append(f"{prefix}\n\n{c.content}")
+            else:
+                texts.append(c.content)
+
+        # Truncar textos que excedan el límite
+        texts = [self._truncate_for_embedding(t) for t in texts]
+
         embeddings = self._get_embeddings_batch(texts, use_parallel=use_parallel)
-        
+
         # Crear puntos para Qdrant
         points = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             # Extraer categoría del file_path (subcarpeta temática)
             # Estructura: books/computacion_cuantica/... o papers/qkd/...
-            # parts[0] = "books" o "papers", parts[1] = categoría temática
             category = "general"
             if file_paths and chunk.doc_id in file_paths:
-                path = file_paths[chunk.doc_id]
-                parts = path.split("/")
-                if len(parts) > 2:
-                    # Usar subcarpeta temática como categoría (ej: computacion_cuantica)
-                    category = parts[1]
-                elif len(parts) > 1:
-                    # Fallback a primera carpeta si no hay subcarpeta
-                    category = parts[0]
-            
+                fp = Path(file_paths[chunk.doc_id])
+                parts = fp.parts
+                # Buscar la parte después de "books" o "papers"
+                for j, part in enumerate(parts):
+                    if part in ("books", "papers") and j + 1 < len(parts):
+                        candidate = parts[j + 1]
+                        # Solo usar como categoría si no es un archivo
+                        if not candidate.endswith(".md"):
+                            category = candidate
+                        break
+
+            payload = {
+                "chunk_id": chunk.chunk_id,
+                "content": chunk.content,
+                "doc_id": chunk.doc_id,
+                "doc_title": chunk.doc_title,
+                "header_path": chunk.header_path,
+                "parent_id": chunk.parent_id,
+                "level": chunk.level.value,
+                "token_count": chunk.token_count,
+                "category": category,
+                # Section metadata (extraída por LLM si use_section_extraction=True)
+                "section_hierarchy": chunk.section_hierarchy,
+                "section_number": chunk.section_number,
+                "topic_summary": chunk.topic_summary,
+                # Difficulty level (si tag_difficulty=True)
+                "difficulty_level": chunk.difficulty_level,
+                "difficulty_confidence": chunk.difficulty_confidence,
+                # Math terms (si extract_math_terms=True)
+                "math_terms": chunk.math_terms,
+            }
+
+            # Guardar context_prefix en payload si existe
+            if chunk.chunk_id in context_map:
+                payload["context_prefix"] = context_map[chunk.chunk_id]
+
             point = PointStruct(
-                id=hash(chunk.chunk_id) % (2**63),  # ID numérico
+                id=_chunk_id_to_qdrant_id(chunk.chunk_id),
                 vector=embedding,
-                payload={
-                    "chunk_id": chunk.chunk_id,
-                    "content": chunk.content,
-                    "doc_id": chunk.doc_id,
-                    "doc_title": chunk.doc_title,
-                    "header_path": chunk.header_path,
-                    "parent_id": chunk.parent_id,
-                    "level": chunk.level.value,
-                    "token_count": chunk.token_count,
-                    "category": category
-                }
+                payload=payload
             )
             points.append(point)
-        
+
         # Insertar en batches
         batch_size = 100
         for i in range(0, len(points), batch_size):
@@ -666,9 +778,251 @@ class LibraryIndexer:
                 collection_name=self.qdrant_collection,
                 points=batch
             )
-        
+
         logger.info(f"Indexados {len(points)} vectores en Qdrant")
+
+        # Indexar proposiciones si está habilitado
+        if self.use_propositions:
+            self._index_propositions_to_qdrant(chunks, file_paths, use_parallel)
+
+    def _extract_section_metadata(self, chunks: List[Chunk]):
+        """
+        Extrae jerarquía de secciones para cada chunk usando LLM.
+        Modifica los chunks in-place añadiendo section_hierarchy, section_number, topic_summary.
+        """
+        from .section_extractor import SectionExtractor
+
+        extractor = SectionExtractor(batch_size=10)
+
+        # Agrupar chunks por doc_id para procesar por documento
+        doc_chunks: Dict[str, List[Chunk]] = {}
+        for chunk in chunks:
+            if chunk.doc_id not in doc_chunks:
+                doc_chunks[chunk.doc_id] = []
+            doc_chunks[chunk.doc_id].append(chunk)
+
+        total_extracted = 0
+        for doc_id, doc_chunk_list in doc_chunks.items():
+            doc_title = doc_chunk_list[0].doc_title
+
+            # Preparar tuplas para extractor
+            chunk_tuples = [
+                (c.chunk_id, c.content, c.header_path)
+                for c in doc_chunk_list
+            ]
+
+            # Extraer metadata
+            section_results = extractor.extract_for_document(chunk_tuples, doc_title)
+
+            # Aplicar resultados a chunks
+            result_map = {r.chunk_id: r for r in section_results}
+            for chunk in doc_chunk_list:
+                if chunk.chunk_id in result_map:
+                    meta = result_map[chunk.chunk_id]
+                    chunk.section_hierarchy = meta.section_hierarchy
+                    chunk.section_number = meta.section_number
+                    chunk.topic_summary = meta.topic_summary
+                    total_extracted += 1
+
+        logger.info(
+            f"Section Extraction: {total_extracted} chunks enriquecidos "
+            f"para {len(doc_chunks)} documentos"
+        )
+
+    def _tag_difficulty_levels(self, chunks: List[Chunk]):
+        """
+        Clasifica el nivel de dificultad de cada chunk.
+        Modifica los chunks in-place añadiendo difficulty_level y difficulty_confidence.
+        """
+        from .difficulty_classifier import DifficultyClassifier
+
+        classifier = DifficultyClassifier(use_llm=self.difficulty_use_llm)
+
+        total_classified = 0
+        for chunk in tqdm(chunks, desc="Clasificando dificultad", leave=False):
+            result = classifier.classify(
+                text=chunk.content,
+                section_hierarchy=chunk.section_hierarchy
+            )
+            chunk.difficulty_level = result.level.value
+            chunk.difficulty_confidence = result.confidence
+            total_classified += 1
+
+        # Estadísticas de distribución
+        level_counts = {}
+        for chunk in chunks:
+            level = chunk.difficulty_level
+            level_counts[level] = level_counts.get(level, 0) + 1
+
+        logger.info(
+            f"Difficulty Tagging: {total_classified} chunks clasificados - "
+            f"Distribución: {level_counts}"
+        )
+
+    def _extract_math_terms(self, chunks: List[Chunk]):
+        """
+        Extrae términos matemáticos de cada chunk para búsqueda math-aware.
+        Modifica los chunks in-place añadiendo math_terms.
+        """
+        from .math_extractor import MathExtractor
+
+        extractor = MathExtractor()
+
+        total_with_math = 0
+        total_terms = 0
+        for chunk in chunks:
+            result = extractor.extract(chunk.content)
+            chunk.math_terms = result.terms
+            if result.terms:
+                total_with_math += 1
+                total_terms += len(result.terms)
+
+        logger.info(
+            f"Math Extraction: {total_with_math} chunks con términos matemáticos, "
+            f"{total_terms} términos totales"
+        )
+
+    def _generate_chunk_contexts(self, chunks: List[Chunk]) -> Dict[str, str]:
+        """
+        Genera prefijos de contexto para chunks agrupados por documento.
+
+        Returns:
+            Dict chunk_id -> context_prefix
+        """
+        from .contextualizer import ChunkContextualizer
+
+        contextualizer = ChunkContextualizer()
+        context_map: Dict[str, str] = {}
+
+        # Agrupar chunks por doc_id
+        doc_chunks: Dict[str, List[Chunk]] = {}
+        for chunk in chunks:
+            if chunk.doc_id not in doc_chunks:
+                doc_chunks[chunk.doc_id] = []
+            doc_chunks[chunk.doc_id].append(chunk)
+
+        for doc_id, doc_chunk_list in doc_chunks.items():
+            # Generar resumen del documento
+            sections_text = "\n".join(
+                f"- {c.header_path}" for c in doc_chunk_list[:20]
+            )
+            doc_title = doc_chunk_list[0].doc_title
+            doc_summary = contextualizer.generate_document_summary(
+                doc_title, sections_text
+            )
+
+            # Contextualizar chunks
+            contexts = contextualizer.contextualize_batch(
+                doc_chunk_list, doc_summary
+            )
+
+            for ctx in contexts:
+                context_map[ctx.chunk_id] = ctx.context_prefix
+
+        logger.info(
+            f"Contextual Retrieval: {len(context_map)} prefijos generados "
+            f"para {len(doc_chunks)} documentos"
+        )
+        return context_map
+
+    def _index_propositions_to_qdrant(
+        self,
+        chunks: List[Chunk],
+        file_paths: Dict[str, str] = None,
+        use_parallel: bool = True
+    ):
+        """Descompone chunks en proposiciones y las indexa en colección separada."""
+        from qdrant_client.models import PointStruct, Distance, VectorParams
+        from .proposition_decomposer import PropositionDecomposer
+
+        prop_collection = self.qdrant_collection + "_propositions"
+
+        # Crear colección de proposiciones si no existe
+        collections = self._qdrant_client.get_collections().collections
+        if prop_collection not in [c.name for c in collections]:
+            self._qdrant_client.create_collection(
+                collection_name=prop_collection,
+                vectors_config=VectorParams(
+                    size=self.embedding_dimensions,
+                    distance=Distance.COSINE
+                )
+            )
+            logger.info(f"Creada colección Qdrant: {prop_collection}")
+
+        # Descomponer chunks
+        decomposer = PropositionDecomposer()
+        all_propositions = []
+
+        logger.info(f"Descomponiendo {len(chunks)} chunks en proposiciones...")
+        batch_results = decomposer.decompose_batch(chunks)
+
+        for chunk_id, props in batch_results.items():
+            all_propositions.extend(props)
+
+        if not all_propositions:
+            logger.warning("No se generaron proposiciones")
+            return
+
+        logger.info(f"Generadas {len(all_propositions)} proposiciones")
+
+        # Generar embeddings
+        prop_texts = [p.content for p in all_propositions]
+        prop_texts = [self._truncate_for_embedding(t) for t in prop_texts]
+        prop_embeddings = self._get_embeddings_batch(
+            prop_texts, use_parallel=use_parallel
+        )
+
+        # Crear puntos
+        points = []
+        for prop, embedding in zip(all_propositions, prop_embeddings):
+            point = PointStruct(
+                id=_chunk_id_to_qdrant_id(prop.proposition_id),
+                vector=embedding,
+                payload={
+                    "proposition_id": prop.proposition_id,
+                    "content": prop.content,
+                    "parent_chunk_id": prop.parent_chunk_id,
+                    "doc_id": prop.doc_id,
+                    "doc_title": prop.doc_title,
+                    "header_path": prop.header_path,
+                    "token_count": prop.token_count,
+                    "content_hash": prop.content_hash,
+                }
+            )
+            points.append(point)
+
+        # Insertar
+        batch_size = 100
+        for i in range(0, len(points), batch_size):
+            batch = points[i:i + batch_size]
+            self._qdrant_client.upsert(
+                collection_name=prop_collection,
+                points=batch
+            )
+
+        logger.info(
+            f"Indexadas {len(points)} proposiciones en '{prop_collection}'"
+        )
     
+    def _remove_document_vectors(self, doc_id: str):
+        """Elimina vectores de Qdrant pertenecientes a un documento."""
+        try:
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            self._qdrant_client.delete(
+                collection_name=self.qdrant_collection,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="doc_id",
+                            match=MatchValue(value=doc_id),
+                        )
+                    ]
+                ),
+            )
+            logger.info(f"Vectores eliminados para doc_id={doc_id}")
+        except Exception as e:
+            logger.warning(f"Error eliminando vectores de {doc_id}: {e}")
+
     def get_stats(self) -> Dict[str, Any]:
         """Obtiene estadísticas de la biblioteca indexada."""
         return {

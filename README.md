@@ -2,12 +2,15 @@
 
 Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Física, Matemáticas y cualquier otra área del conocimiento.
 
-> 📖 **Documentación técnica completa:** [docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md)  
+> 📖 **Documentación técnica completa:** [docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md)
 > 🤖 **Manual para agentes IA:** [docs/CLI_AGENT_MANUAL.md](docs/CLI_AGENT_MANUAL.md)
+> 🧠 **Guía para Claude Code:** [CLAUDE.md](CLAUDE.md) ← **Para agentes de IA**
 
 ## 📋 Características
 
 - **🔍 Búsqueda híbrida**: Vector (semántica) + BM25 (léxica) + Grafo (relaciones)
+- **🎓 Filtrado por nivel**: 4 niveles de dificultad (introductory → research) para adaptar al estudiante
+- **🔢 Búsqueda math-aware**: Extrae términos de LaTeX (∑ → sumatorio, ∫ → integral) para mejor búsqueda
 - **🎯 Re-ranking**: Cross-Encoder opcional que mejora precisión +15-25%
 - **🚀 HyDE**: Query expansion con documentos hipotéticos (+10-20% recall)
 - **📝 Evaluación RAGAS**: Pipeline de evaluación con 6 métricas de calidad
@@ -26,7 +29,7 @@ Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Fí
 - **💬 Memoria Conversacional**: Sesiones multi-turno con detección de followup
 - **🐳 Docker**: Stack completo con Qdrant + App + Sandbox aislado
 - **📊 Logging Estructurado**: structlog con tracing y métricas
-- **🧪 Tests**: 66 tests unitarios + integración
+- **🧪 Tests**: 343 tests unitarios + integración
 
 ## 🚀 Instalación
 
@@ -72,7 +75,33 @@ python -m src.cli.ingest_library
 
 ## 📖 Uso
 
-### Consulta simple
+### API para Agentes (Recomendada) - `librari`
+
+El CLI `librari` está optimizado para agentes de IA con output JSON estructurado:
+
+```bash
+# Estadísticas de la biblioteca
+python -m src.cli.librari stats
+
+# Explorar qué contenido hay sobre un tema
+python -m src.cli.librari explore "algoritmo de Shor"
+
+# Recuperar TODO el contenido (sin límite top-k)
+python -m src.cli.librari retrieve "QFT" --exhaustive
+
+# Pregunta con respuesta citada
+python -m src.cli.librari query "¿Cuál es la complejidad de Shor?" --grounded
+
+# Verificar una afirmación contra las fuentes
+python -m src.cli.librari verify --claim "Shor factoriza en O(log³n)"
+
+# Generar citas formateadas
+python -m src.cli.librari cite --chunks "nc_micro_000123" --style apa
+```
+
+Ver [CLAUDE.md](CLAUDE.md) para documentación completa del API para agentes.
+
+### Consulta simple (CLI clásico)
 
 ```bash
 python -m src.cli.ask_library "¿Qué es el algoritmo de Shor?"
@@ -174,6 +203,47 @@ python -m src.cli.ask_library "¿Qué es un qubit?" --filter category:computacio
 # Múltiples filtros
 python -m src.cli.ask_library "BB84" --filter category:comunicacion_cuantica --filter doc_title:Nielsen
 ```
+
+### Filtrado por Nivel de Dificultad
+
+Filtra contenido según el nivel del estudiante:
+
+```bash
+# Solo contenido introductorio
+python -m src.cli.librari retrieve "qubit" --level introductory
+
+# Contenido de investigación
+python -m src.cli.librari retrieve "quantum error correction" --level research
+
+# Combinar niveles
+python -m src.cli.librari retrieve "entrelazamiento" --level "introductory,intermediate"
+```
+
+| Nivel | Descripción |
+|-------|-------------|
+| `introductory` | Conceptos básicos, definiciones simples, primeros capítulos |
+| `intermediate` | Teoremas, demostraciones simples, aplicaciones |
+| `advanced` | Matemáticas complejas, demostraciones rigurosas |
+| `research` | Papers, resultados de vanguardia, problemas abiertos |
+
+### Búsqueda Math-Aware
+
+Mejora la búsqueda de contenido matemático expandiendo términos LaTeX:
+
+```bash
+# Busca "producto tensorial" incluyendo chunks con \otimes, tensor product, Kronecker...
+python -m src.cli.librari retrieve "producto tensorial" --math-aware
+
+# Busca integrales aunque el texto use \int, integration, etc.
+python -m src.cli.librari retrieve "integral" --math-aware
+```
+
+**Términos expandidos automáticamente:**
+- `sumatorio` → `\sum`, summation, sum, sigma
+- `integral` → `\int`, integration
+- `autovalor` → eigenvalue, valor propio
+- `entrelazamiento` → entanglement, entangled
+- Y muchos más (producto tensorial, traza, determinante, etc.)
 
 ### HyDE (Query Expansion)
 
@@ -458,6 +528,15 @@ python -m src.cli.ingest_library --dry-run
 # Chunking semántico (detecta definiciones, teoremas, demostraciones)
 python -m src.cli.ingest_library --semantic-chunking --force
 
+# Etiquetar dificultad (introductory/intermediate/advanced/research)
+python -m src.cli.ingest_library --tag-difficulty --force
+
+# Extraer términos matemáticos de LaTeX para búsqueda math-aware
+python -m src.cli.ingest_library --extract-math --force
+
+# Combinar ambas mejoras (recomendado)
+python -m src.cli.ingest_library --tag-difficulty --extract-math --force
+
 # Indexación paralela (3-5x más rápido, activado por defecto)
 python -m src.cli.ingest_library --force --workers 8
 
@@ -598,11 +677,11 @@ Uso personal/educativo. Los contenidos de la biblioteca son propiedad de sus res
 
 ## 📊 Estadísticas de la Biblioteca (Enero 2026)
 
-| Categoría  | Contenido                     | Palabras       |
-| ---------- | ----------------------------- | -------------- |
-| **Libros** | 33 libros en 10 categorías    | ~5.3M          |
-| **Papers** | 10 papers en 2 categorías     | ~160K          |
-| **Total**  | 43 documentos, ~56,000 chunks | ~5.5M palabras |
+| Categoría  | Contenido                      | Palabras       |
+| ---------- | ------------------------------ | -------------- |
+| **Libros** | 33 libros en 10 categorías     | ~5.3M          |
+| **Papers** | 26 papers en múltiples áreas   | ~200K          |
+| **Total**  | 59 documentos, ~58,800 chunks  | ~5.5M palabras |
 
 ### Desglose por área:
 
@@ -617,5 +696,5 @@ Uso personal/educativo. Los contenidos de la biblioteca son propiedad de sus res
 
 ---
 
-**Autor**: Desarrollado para el Máster en Computación Cuántica - UNIR  
-**Última actualización**: Enero 2026
+**Autor**: Desarrollado para el Máster en Computación Cuántica - UNIR
+**Última actualización**: Febrero 2026
