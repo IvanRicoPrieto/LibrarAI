@@ -105,7 +105,7 @@ class HybridFusion:
         if reranker_preset:
             self._init_reranker(reranker_preset)
     
-    def _init_reranker(self, preset: str):
+    def _init_reranker(self, preset: str) -> None:
         """Inicializa el reranker con el preset especificado."""
         try:
             from .reranker import RerankerFactory
@@ -243,7 +243,7 @@ class HybridFusion:
         rank: int,
         source: RetrieverType,
         result: Union[VectorSearchResult, BM25SearchResult]
-    ):
+    ) -> None:
         """Añade score RRF de un resultado."""
         rrf_score = 1.0 / (self.k + rank)
         
@@ -270,7 +270,7 @@ class HybridFusion:
         chunk_id: str,
         rank: int,
         result: GraphSearchResult
-    ):
+    ) -> None:
         """Añade score RRF desde resultado de grafo."""
         rrf_score = 1.0 / (self.k + rank)
         

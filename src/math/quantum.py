@@ -75,7 +75,7 @@ try:
         "numeric_value": 1.0 if is_unitary else 0.0,
         "assumptions": ["unitary_check"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -108,7 +108,7 @@ try:
         "numeric_value": 1.0 if is_hermitian else 0.0,
         "assumptions": ["hermitian_check", f"eigenvalues_real={{all_real}}"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -134,7 +134,7 @@ try:
         "numeric_value": None,
         "assumptions": ["tensor_product"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -193,7 +193,7 @@ try:
         "numeric_value": None,
         "assumptions": ["partial_trace", f"trace_out={trace_out}", f"dims={dims}"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -220,7 +220,7 @@ try:
         "numeric_value": None,
         "assumptions": ["commutator", f"commutes={{comm_is_zero}}"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -246,7 +246,7 @@ try:
         "numeric_value": None,
         "assumptions": ["anticommutator"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -328,7 +328,7 @@ try:
             f"dim={{gate.rows}}x{{gate.cols}}"
         ],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -361,7 +361,7 @@ try:
         "numeric_value": complex(norm.evalf()) if norm.is_number else None,
         "assumptions": [f"normalized={{sp.simplify(norm - 1) == 0}}"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -398,7 +398,7 @@ try:
         "numeric_value": float(total_simplified.evalf()) if total_simplified.is_number else None,
         "assumptions": [f"total_probability={{total_simplified}}"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -432,7 +432,7 @@ try:
         "numeric_value": float(entropy.evalf()) if entropy.is_number else None,
         "assumptions": ["von_neumann_entropy", "base_2"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -471,7 +471,7 @@ try:
         "numeric_value": float(fid.evalf()) if fid.is_number else None,
         "assumptions": ["fidelity"],
     }}
-except Exception as e:
+except (ValueError, TypeError, RuntimeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")

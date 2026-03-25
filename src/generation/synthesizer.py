@@ -69,6 +69,7 @@ class ResponseSynthesizer:
         self.temperature = temperature
         self.max_output_tokens = max_output_tokens
         self.prompt_builder = PromptBuilder()
+        self._math_config = self._load_math_config()
 
     def generate(
         self,
@@ -163,14 +164,15 @@ class ResponseSynthesizer:
 
     def _math_computation_enabled(self) -> bool:
         """Comprueba si la computación matemática está habilitada en settings."""
-        return self._get_math_config().get("enabled", False)
+        return self._math_config.get("enabled", False)
 
     def _multi_agent_enabled(self) -> bool:
         """Comprueba si el modo multi-agente está habilitado."""
-        return self._get_math_config().get("multi_agent", {}).get("enabled", False)
+        return self._math_config.get("multi_agent", {}).get("enabled", False)
 
-    def _get_math_config(self) -> Dict:
-        """Lee la configuración de math_computation de settings.yaml."""
+    @staticmethod
+    def _load_math_config() -> Dict:
+        """Lee la configuración de math_computation de settings.yaml (una sola vez)."""
         try:
             from pathlib import Path
             import yaml
@@ -179,7 +181,7 @@ class ResponseSynthesizer:
                 with open(settings_path) as f:
                     settings = yaml.safe_load(f)
                 return settings.get("math_computation", {})
-        except Exception:
+        except (FileNotFoundError, yaml.YAMLError, KeyError):
             pass
         return {}
 
@@ -287,7 +289,7 @@ class ResponseSynthesizer:
         import time
         start_time = time.time()
 
-        config = self._get_math_config()
+        config = self._math_config
         ma_config = config.get("multi_agent", {})
 
         orchestrator = MultiAgentOrchestrator(

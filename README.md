@@ -29,7 +29,7 @@ Sistema RAG (Retrieval-Augmented Generation) para consultar tu biblioteca de Fí
 - **💬 Memoria Conversacional**: Sesiones multi-turno con detección de followup
 - **🐳 Docker**: Stack completo con Qdrant + App + Sandbox aislado
 - **📊 Logging Estructurado**: structlog con tracing y métricas
-- **🧪 Tests**: 343 tests unitarios + integración
+- **🧪 Tests**: 390 funciones de test en 22 archivos (unitarios + integración + E2E)
 
 ## 🚀 Instalación
 

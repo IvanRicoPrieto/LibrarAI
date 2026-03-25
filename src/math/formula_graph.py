@@ -164,7 +164,7 @@ try:
             degree = sp.degree(sp.Poly(expr, free_vars[0]))
         else:
             degree = 0
-    except Exception:
+    except (ValueError, TypeError, sp.PolynomialError):
         degree = -1
 
     n_ops = sp.count_ops(expr, visual=False)
@@ -178,7 +178,7 @@ try:
         "has_exp": has_exp,
         "polynomial_degree": degree,
     }}
-except Exception as e:
+except (ValueError, TypeError) as e:
     result = {{"error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -229,7 +229,7 @@ try:
                 equivalent = True
                 method = name
                 break
-        except Exception:
+        except (ValueError, TypeError):
             continue
 
     if not equivalent:
@@ -237,11 +237,11 @@ try:
             if diff.equals(0):
                 equivalent = True
                 method = "equals"
-        except Exception:
+        except (ValueError, TypeError):
             pass
 
     result = {{"equivalent": equivalent, "method": method}}
-except Exception as e:
+except (ValueError, TypeError) as e:
     result = {{"equivalent": False, "method": "error", "error": str(e)}}
 
 print("__MATH_RESULT__")

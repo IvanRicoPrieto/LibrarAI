@@ -3,14 +3,8 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Framework RAG
+# Framework RAG (llama-index removido — no se usa en el código actual)
 # -----------------------------------------------------------------------------
-llama-index>=0.10.0
-llama-index-core>=0.10.0
-llama-index-vector-stores-qdrant>=0.2.0
-llama-index-embeddings-openai>=0.1.0
-llama-index-llms-openai>=0.1.0
-llama-index-llms-anthropic>=0.1.0
 
 # -----------------------------------------------------------------------------
 # Vector Database
@@ -50,7 +44,7 @@ sentence-transformers>=2.2.0
 # -----------------------------------------------------------------------------
 tiktoken>=0.5.0  # Tokenización para contar tokens
 markdown>=3.5
-beautifulsoup4>=4.12.0
+# beautifulsoup4>=4.12.0  # No se usa en el código actual
 regex>=2023.0
 
 # -----------------------------------------------------------------------------
@@ -59,7 +53,7 @@ regex>=2023.0
 pyyaml>=6.0
 python-dotenv>=1.0.0
 rich>=13.0  # Para output bonito en CLI
-click>=8.1.0  # CLI framework
+# click>=8.1.0  # No se usa — CLI usa argparse
 tqdm>=4.66.0  # Progress bars
 
 # -----------------------------------------------------------------------------

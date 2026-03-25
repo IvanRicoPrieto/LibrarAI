@@ -12,6 +12,8 @@ import sys
 import json
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -32,6 +34,7 @@ if _env_file.exists():
 # FASE 3: Multi-agente + Provenance
 # ============================================================
 
+@pytest.mark.e2e
 def test_provenance_graph():
     """E2E: ProvenanceGraph registra trazabilidad W3C PROV."""
     from src.math.provenance import (
@@ -92,9 +95,9 @@ def test_provenance_graph():
     print(f"ProvenanceGraph: OK")
     print(f"  {graph.summary()}")
     print(f"  Lineage depth for final response: {len(lineage)} nodes")
-    return True
 
 
+@pytest.mark.e2e
 def test_derivation_step_structure():
     """E2E: DerivationStep y DerivationPlan se serializan correctamente."""
     from src.math.agents import DerivationStep, DerivationPlan, StepStatus
@@ -128,9 +131,9 @@ def test_derivation_step_structure():
     assert d["steps"][0]["status"] == "verified"
 
     print("DerivationStep/Plan: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_calculator_agent():
     """E2E: CalculatorAgent ejecuta pasos en sandbox real."""
     from src.math.agents import CalculatorAgent, DerivationStep
@@ -161,9 +164,9 @@ def test_calculator_agent():
     assert not result2.success  # Expected: no expression, no LLM
 
     print("CalculatorAgent: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_verifier_agent():
     """E2E: VerifierAgent produce MathArtifacts."""
     from src.math.agents import VerifierAgent, DerivationStep
@@ -197,9 +200,9 @@ def test_verifier_agent():
     assert artifact2 is not None
 
     print("VerifierAgent: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_multi_agent_orchestrator_no_llm():
     """E2E: MultiAgentOrchestrator sin LLM (modo estructurado)."""
     from src.math.agents import MultiAgentOrchestrator
@@ -226,13 +229,13 @@ def test_multi_agent_orchestrator_no_llm():
     print(f"  Steps: {result['steps_verified']}/{result['steps_total']} verified")
     print(f"  Artifacts: {len(result['artifacts'])}")
     print(f"  Provenance: {len(prov['entities'])} entities, {len(prov['activities'])} activities")
-    return True
 
 
 # ============================================================
 # FASE 4: Computación Cuántica
 # ============================================================
 
+@pytest.mark.e2e
 def test_quantum_gates():
     """E2E: QuantumEngine genera y verifica puertas cuánticas."""
     from src.math.quantum import QuantumEngine
@@ -260,9 +263,9 @@ def test_quantum_gates():
     print(f"Quantum gates: {len(results)}/{len(results)} OK")
     for k, v in results.items():
         print(f"  {k}: {v}")
-    return True
 
 
+@pytest.mark.e2e
 def test_quantum_operations():
     """E2E: QuantumEngine operaciones cuánticas avanzadas."""
     from src.math.quantum import QuantumEngine
@@ -295,9 +298,9 @@ def test_quantum_operations():
     print(f"  P(|+⟩): {r.output_expr[:60]}")
 
     print("Quantum operations: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_quantum_verification():
     """E2E: Verificación de unitariedad y hermiticidad."""
     from src.math.quantum import QuantumEngine
@@ -317,9 +320,9 @@ def test_quantum_verification():
     print(f"  Pauli X hermítica: {r.output_expr}")
 
     print("Quantum verification: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_von_neumann_entropy():
     """E2E: Entropía de von Neumann para estados cuánticos."""
     from src.math.quantum import QuantumEngine
@@ -338,13 +341,13 @@ def test_von_neumann_entropy():
     print(f"  S(I/2) = {r.output_expr}")
 
     print("Von Neumann entropy: OK")
-    return True
 
 
 # ============================================================
 # FASE 5: Knowledge Graph Computacional
 # ============================================================
 
+@pytest.mark.e2e
 def test_formula_fingerprinting():
     """E2E: Fingerprinting simbólico de fórmulas."""
     from src.math.formula_graph import FormulaFingerprintEngine
@@ -370,9 +373,9 @@ def test_formula_fingerprinting():
     print(f"  sin(x)^2+cos(x)^2: hash={fp1.hash}, trig={fp1.has_trig}")
     print(f"  sin(y)^2+cos(y)^2: hash={fp2.hash}, trig={fp2.has_trig}")
     print(f"  x^2+x+1: hash={fp3.hash}, trig={fp3.has_trig}")
-    return True
 
 
+@pytest.mark.e2e
 def test_formula_equivalence():
     """E2E: Detección de equivalencia simbólica."""
     from src.math.formula_graph import FormulaFingerprintEngine
@@ -394,9 +397,9 @@ def test_formula_equivalence():
     print(f"  sin(x) == cos(x): {equiv} (method: {method})")
 
     print("Formula equivalence: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_formula_graph():
     """E2E: Knowledge Graph de fórmulas completo."""
     from src.math.formula_graph import FormulaGraph, RelationType
@@ -467,9 +470,9 @@ def test_formula_graph():
 
     print(f"FormulaGraph: OK")
     print(f"  {graph.summary()}")
-    return True
 
 
+@pytest.mark.e2e
 def test_rewrite_rules():
     """E2E: Reglas de reescritura del e-graph."""
     from src.math.formula_graph import FormulaGraph
@@ -491,13 +494,13 @@ def test_rewrite_rules():
         print(f"    → {expr} (via {rule.name})")
 
     print("Rewrite rules: OK")
-    return True
 
 
 # ============================================================
 # FASE 6: Verificación Formal (Lean 4)
 # ============================================================
 
+@pytest.mark.e2e
 def test_lean_interface():
     """E2E: LeanInterface detecta disponibilidad de Lean 4."""
     from src.math.formal_verifier import LeanInterface
@@ -514,9 +517,9 @@ def test_lean_interface():
         print(f"  Lean 4 no disponible (esperado en este sistema)")
 
     print("LeanInterface: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_autoformalizator_templates():
     """E2E: Autoformalizator genera templates sin LLM."""
     from src.math.formal_verifier import Autoformalizator
@@ -530,9 +533,9 @@ def test_autoformalizator_templates():
 
     print("Autoformalizator templates: OK")
     print(f"  Generated: {code[:80]}...")
-    return True
 
 
+@pytest.mark.e2e
 def test_formal_verifier():
     """E2E: FormalVerifier pipeline completo (sin Lean = graceful degradation)."""
     from src.math.formal_verifier import FormalVerifier
@@ -555,9 +558,9 @@ def test_formal_verifier():
     assert json_str
 
     print("FormalVerifier: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_lean_result_structure():
     """E2E: LeanResult se crea correctamente."""
     from src.math.formal_verifier import LeanResult
@@ -573,13 +576,13 @@ def test_lean_result_structure():
     assert len(result.errors) == 1
 
     print("LeanResult structure: OK")
-    return True
 
 
 # ============================================================
 # INTEGRACIÓN: Fases 3-6 juntas
 # ============================================================
 
+@pytest.mark.e2e
 def test_quantum_with_verification():
     """E2E: Computación cuántica + verificación multi-nivel."""
     from src.math.quantum import QuantumEngine
@@ -599,9 +602,9 @@ def test_quantum_with_verification():
         print(f"  Pauli X {name}: {artifact.verification_level.name} PASS")
 
     print("Quantum + Verification: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_full_pipeline_phases_3_6():
     """E2E: Pipeline completo Fases 3-6 integrado."""
     from src.math.agents import MultiAgentOrchestrator
@@ -639,75 +642,7 @@ def test_full_pipeline_phases_3_6():
     print(f"  Quantum: Hadamard gate generated")
     print(f"  Formula graph: {graph.summary()}")
     print(f"  Formal: {proof.artifact.verification_level.name}")
-    return True
-
-
-# ============================================================
-# Runner
-# ============================================================
-
-def main():
-    tests = [
-        # Phase 3
-        ("Provenance Graph", test_provenance_graph),
-        ("Derivation structures", test_derivation_step_structure),
-        ("Calculator Agent", test_calculator_agent),
-        ("Verifier Agent", test_verifier_agent),
-        ("Multi-Agent Orchestrator", test_multi_agent_orchestrator_no_llm),
-
-        # Phase 4
-        ("Quantum Gates", test_quantum_gates),
-        ("Quantum Operations", test_quantum_operations),
-        ("Quantum Verification", test_quantum_verification),
-        ("Von Neumann Entropy", test_von_neumann_entropy),
-
-        # Phase 5
-        ("Formula Fingerprinting", test_formula_fingerprinting),
-        ("Formula Equivalence", test_formula_equivalence),
-        ("Formula Graph", test_formula_graph),
-        ("Rewrite Rules", test_rewrite_rules),
-
-        # Phase 6
-        ("Lean Interface", test_lean_interface),
-        ("Autoformalizator", test_autoformalizator_templates),
-        ("Formal Verifier", test_formal_verifier),
-        ("Lean Result", test_lean_result_structure),
-
-        # Integration
-        ("Quantum + Verification", test_quantum_with_verification),
-        ("Full Pipeline 3-6", test_full_pipeline_phases_3_6),
-    ]
-
-    passed = 0
-    failed = 0
-
-    print("=" * 60)
-    print("TESTS E2E - FASES 3, 4, 5 Y 6")
-    print("=" * 60)
-
-    for name, test_fn in tests:
-        print(f"\n--- {name} ---")
-        try:
-            result = test_fn()
-            if result:
-                passed += 1
-                print(f"  => PASS")
-            else:
-                failed += 1
-                print(f"  => FAIL")
-        except Exception as e:
-            failed += 1
-            print(f"  => ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-
-    print(f"\n{'=' * 60}")
-    print(f"RESULTADOS: {passed} passed, {failed} failed")
-    print(f"{'=' * 60}")
-
-    return failed == 0
 
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    pytest.main([__file__, "-v"])

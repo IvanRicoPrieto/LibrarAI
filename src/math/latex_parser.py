@@ -152,6 +152,11 @@ Expresión: {latex}""",
             result = result.replace(r'\cdot', '*')
             result = result.replace(r'\times', '*')
 
+            # Multiplicación implícita: 2x → 2*x, 3pi → 3*pi
+            result = re.sub(r'(\d)([a-zA-Z])', r'\1*\2', result)
+            # Multiplicación implícita por yuxtaposición: "pi r" → "pi*r", "x y" → "x*y"
+            result = re.sub(r'([a-zA-Z0-9)]) ([a-zA-Z(])', r'\1*\2', result)
+
             # Limpiar backslashes restantes
             result = re.sub(r'\\[a-zA-Z]+', '', result)
 

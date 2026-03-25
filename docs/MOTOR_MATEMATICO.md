@@ -44,45 +44,45 @@
                  │
      ┌───────────┼───────────────────────┐
      ▼           ▼                       ▼
-┌─────────┐ ┌──────────────┐  ┌───────────────────┐
-│MathEngine│ │Verification  │  │  QuantumEngine     │
-│  (F1)    │ │Pipeline (F2) │  │     (F4)           │
-│          │ │              │  │                     │
-│ SymPy    │ │ L0:Dimensio. │  │ Puertas cuánticas  │
-│ NumPy    │ │ L1:Numérico  │  │ Conmutadores       │
-│ Sandbox  │ │ L2:Simbólico │  │ Entropía von Neum. │
-└─────────┘ │ L3:Físico    │  │ Fidelidad          │
-            │ L5:Formal    │  └───────────────────┘
-            └──────┬───────┘
+┌───────────┐ ┌──────────────┐  ┌───────────────────┐
+│MathEngine │ │Verification  │  │  QuantumEngine    │
+│  (F1)     │ │Pipeline (F2) │  │     (F4)          │
+│           │ │              │  │                   │
+│ SymPy     │ │ L0:Dimensio. │  │ Puertas cuánticas │
+│ NumPy     │ │ L1:Numérico  │  │ Conmutadores      │
+│ Sandbox   │ │ L2:Simbólico │  │ Entropía von Neum.│
+└───────────┘ │ L3:Físico    │  │ Fidelidad         │
+              │ L5:Formal    │  └───────────────────┘
+              └────┬─────────┘
                    │
      ┌─────────────┼──────────────────┐
      ▼             ▼                  ▼
-┌──────────┐ ┌───────────┐  ┌─────────────────┐
+┌──────────┐ ┌───────────┐  ┌──────────────────┐
 │ Wolfram  │ │ Formula   │  │ FormalVerifier   │
 │ Client   │ │ Graph (F5)│  │    (F6)          │
 │  (F2)    │ │           │  │                  │
 │ API ext. │ │Fingerprint│  │ LeanInterface    │
 └──────────┘ │E-graph    │  │ Autoformalizator │
              │Rewrite    │  │ Repair loop      │
-             └───────────┘  └─────────────────┘
+             └───────────┘  └──────────────────┘
 ```
 
 ### Mapa de Archivos
 
-| Archivo | Fase | Descripción |
-|---------|------|-------------|
-| `src/math/engine.py` | 1 | Motor SymPy en sandbox |
-| `src/math/orchestrator.py` | 1 | Loop bidireccional LLM ↔ Sandbox (ToRA) |
-| `src/math/verification.py` | 2 | Pipeline de verificación (5 niveles) |
-| `src/math/artifacts.py` | 2 | Evidencia computacional (MathArtifact) |
-| `src/math/latex_parser.py` | 2 | Conversión LaTeX → SymPy con confianza |
-| `src/math/wolfram_client.py` | 2 | Cliente Wolfram Alpha LLM API |
-| `src/math/agents.py` | 3 | 4 agentes especializados |
-| `src/math/provenance.py` | 3 | Grafo W3C PROV de trazabilidad |
-| `src/math/quantum.py` | 4 | Motor de computación cuántica |
-| `src/math/formula_graph.py` | 5 | Knowledge graph de fórmulas |
-| `src/math/formula_retriever.py` | 5 | Puente FormulaGraph ↔ retrieval |
-| `src/math/formal_verifier.py` | 6 | Integración con Lean 4 |
+| Archivo                         | Fase | Descripción                             |
+| ------------------------------- | ---- | --------------------------------------- |
+| `src/math/engine.py`            | 1    | Motor SymPy en sandbox                  |
+| `src/math/orchestrator.py`      | 1    | Loop bidireccional LLM ↔ Sandbox (ToRA) |
+| `src/math/verification.py`      | 2    | Pipeline de verificación (5 niveles)    |
+| `src/math/artifacts.py`         | 2    | Evidencia computacional (MathArtifact)  |
+| `src/math/latex_parser.py`      | 2    | Conversión LaTeX → SymPy con confianza  |
+| `src/math/wolfram_client.py`    | 2    | Cliente Wolfram Alpha LLM API           |
+| `src/math/agents.py`            | 3    | 4 agentes especializados                |
+| `src/math/provenance.py`        | 3    | Grafo W3C PROV de trazabilidad          |
+| `src/math/quantum.py`           | 4    | Motor de computación cuántica           |
+| `src/math/formula_graph.py`     | 5    | Knowledge graph de fórmulas             |
+| `src/math/formula_retriever.py` | 5    | Puente FormulaGraph ↔ retrieval         |
+| `src/math/formal_verifier.py`   | 6    | Integración con Lean 4                  |
 
 ---
 
@@ -152,6 +152,7 @@ response, steps, artifacts = orch.run(
 ```
 
 **Flujo interno:**
+
 1. LLM genera respuesta con `<COMPUTE>` tags
 2. `_extract_compute_blocks()` extrae el código (soporta con/sin triple backtick)
 3. `engine.execute_raw()` ejecuta en sandbox
@@ -170,13 +171,13 @@ response, steps, artifacts = orch.run(
 Pipeline secuencial de 5 niveles de rigor creciente. Se detiene al primer
 nivel que da un resultado definitivo.
 
-| Nivel | Nombre | Motor | Descripción |
-|-------|--------|-------|-------------|
-| 0 | Dimensional | Pint | Consistencia de unidades (m/s vs kg) |
-| 1 | Numérico | NumPy | Sampling aleatorio (100 puntos, tol. 1e-8) |
-| 2 | Simbólico | SymPy | Transforms específicos (expand, factor, trigsimp...) |
-| 3 | Físico | SymPy | Invariantes (unitariedad, hermiticidad, traza, norma) |
-| 5 | Formal | Lean 4 | Prueba formal verificada por compilador |
+| Nivel | Nombre      | Motor  | Descripción                                           |
+| ----- | ----------- | ------ | ----------------------------------------------------- |
+| 0     | Dimensional | Pint   | Consistencia de unidades (m/s vs kg)                  |
+| 1     | Numérico    | NumPy  | Sampling aleatorio (100 puntos, tol. 1e-8)            |
+| 2     | Simbólico   | SymPy  | Transforms específicos (expand, factor, trigsimp...)  |
+| 3     | Físico      | SymPy  | Invariantes (unitariedad, hermiticidad, traza, norma) |
+| 5     | Formal      | Lean 4 | Prueba formal verificada por compilador               |
 
 ```python
 pipeline = VerificationPipeline(max_level=3)
@@ -210,6 +211,7 @@ artifact = pipeline.verify(
 > no es determinista entre versiones de SymPy.
 
 **Nivel 3 — Invariantes físicos soportados:**
+
 - `unitary`: U†U = I
 - `hermitian`: H = H†
 - `trace_one`: Tr(ρ) = 1
@@ -242,6 +244,7 @@ artifact = MathArtifact.from_math_result(math_result, source_chunks=["..."])
 ```
 
 **Campos principales:**
+
 - **Input:** `input_latex`, `input_sympy`, `parse_confidence`
 - **Computación:** `engine`, `operation`, `code`, `result`, `result_latex`
 - **Verificación:** `verification_level`, `verification_passed`, `verification_details`
@@ -259,6 +262,7 @@ sympy_str, confidence = parser.parse(r"\frac{x^2 + 1}{x - 1}")
 ```
 
 **Estrategia de parsing (en orden):**
+
 1. Parsing determinista con `latex2sympy2`
 2. Normalización LLM para LaTeX malformado (opcional)
 3. Fallback con regex manual (`\frac{a}{b}` → `(a)/(b)`, etc.)
@@ -305,6 +309,7 @@ Cuatro agentes especializados coordinados por un orchestrator:
 ```
 
 #### PlannerAgent
+
 Descompone un problema en 3-8 pasos verificables.
 
 ```python
@@ -324,6 +329,7 @@ plan = planner.plan(
 ```
 
 #### CalculatorAgent
+
 Ejecuta cada paso en el sandbox.
 
 ```python
@@ -335,6 +341,7 @@ result = calculator.compute_step(step, prev_results=[], llm_fn=my_llm)
 - Si no → LLM genera código → ejecución en sandbox
 
 #### VerifierAgent
+
 Verifica cada paso con VerificationPipeline (niveles 1-2).
 
 ```python
@@ -343,6 +350,7 @@ artifact = verifier.verify_step(step, math_result=result)
 ```
 
 #### SynthesizerAgent
+
 Genera la respuesta final con citas y evidencia.
 
 ```python
@@ -461,15 +469,15 @@ invariants = qe.verify_quantum_invariants(
 
 **Puertas soportadas:**
 
-| Puerta | Qubits | Parámetros |
-|--------|--------|-----------|
-| H | 1 | — |
-| X, Y, Z | 1 | — |
-| S, T | 1 | — |
-| Rx, Ry, Rz | 1 | `theta` |
-| CNOT, CZ | 2 | — |
-| SWAP | 2 | — |
-| QFT | N | `n` (número de qubits) |
+| Puerta     | Qubits | Parámetros             |
+| ---------- | ------ | ---------------------- |
+| H          | 1      | —                      |
+| X, Y, Z    | 1      | —                      |
+| S, T       | 1      | —                      |
+| Rx, Ry, Rz | 1      | `theta`                |
+| CNOT, CZ   | 2      | —                      |
+| SWAP       | 2      | —                      |
+| QFT        | N      | `n` (número de qubits) |
 
 > **Nota sobre eigenvalores:** La entropía de von Neumann y la fidelidad
 > usan `eigenvals().items()` con multiplicidad para resultados correctos.
@@ -501,6 +509,7 @@ equiv, method = fpe.are_equivalent("sin(2*x)", "2*sin(x)*cos(x)")
 ```
 
 **Propiedades del fingerprint:**
+
 - `ops_signature`: Operaciones ordenadas extraídas vía `srepr()`
 - `n_free_vars`: Número de variables libres
 - `depth`: Profundidad del árbol de expresión
@@ -574,6 +583,7 @@ related = retriever.find_related_formulas("sin(x)**2 + cos(x)**2")
 ### Concepto
 
 Pipeline aspiracional de verificación formal:
+
 1. El LLM traduce una proposición a Lean 4 (autoformalization)
 2. El compilador Lean 4 verifica la prueba
 3. Si falla, el LLM corrige (repair loop, hasta 3 intentos)
@@ -600,6 +610,7 @@ proof = verifier.verify(
 ### Componentes
 
 #### `LeanInterface`
+
 Wrapper del compilador Lean 4 vía subprocess.
 
 ```python
@@ -613,6 +624,7 @@ result = lean.check("theorem trivial : True := trivial")
 Busca Lean en `~/.elan/bin/lean` o en `PATH`.
 
 #### `Autoformalizator`
+
 Traduce lenguaje natural + LaTeX a Lean 4.
 
 ```python
@@ -632,6 +644,7 @@ fixed = formalizer.repair(code, errors=["unknown identifier 'Real'"], llm_fn=my_
 ### Degradación Graceful
 
 Si Lean 4 no está instalado en el sistema:
+
 - `FormalVerifier.available` → `False`
 - `verify()` retorna un `FormalProof` con `verified=False`
 - El `MathArtifact` asociado tiene `verification_level=NONE`
@@ -648,21 +661,23 @@ El motor matemático se integra en el método `_generate_with_computation()`,
 que despacha entre dos modos según la configuración:
 
 #### Modo Básico (Fase 1)
+
 ```yaml
 math_computation:
   enabled: true
   multi_agent:
-    enabled: false  # ← modo básico
+    enabled: false # ← modo básico
 ```
 
 Usa `MathComputationOrchestrator` con el loop `<COMPUTE>` ↔ `<RESULT>`.
 
 #### Modo Multi-Agente (Fase 3)
+
 ```yaml
 math_computation:
   enabled: true
   multi_agent:
-    enabled: true  # ← modo multi-agente
+    enabled: true # ← modo multi-agente
 ```
 
 Usa `MultiAgentOrchestrator` con los 4 agentes, provenance, y
@@ -686,6 +701,7 @@ response.metadata = {
 ### Detección de Consultas Matemáticas
 
 El `QueryTypeClassifier` detecta queries de tipo `MATHEMATICAL` mediante:
+
 - Presencia de LaTeX (`$...$`, `\frac`, `\int`, etc.)
 - Verbos matemáticos conjugados: "demuestra", "deriva", "calcula", "integra", "resuelve"
 - Palabras clave: "eigenvalue", "hamiltoniano", "conmutador", etc.
@@ -698,47 +714,47 @@ Todas las opciones en `config/settings.yaml` bajo `math_computation`:
 
 ```yaml
 math_computation:
-  enabled: true                    # Activar motor matemático
-  max_iterations: 5                # Máx. iteraciones del loop <COMPUTE>
-  timeout_per_step_seconds: 30     # Timeout por ejecución en sandbox
+  enabled: true # Activar motor matemático
+  max_iterations: 5 # Máx. iteraciones del loop <COMPUTE>
+  timeout_per_step_seconds: 30 # Timeout por ejecución en sandbox
 
   verification:
-    enabled: false                 # Activar verificación automática
-    default_level: 1               # Nivel mínimo por defecto
-    max_level: 3                   # Nivel máximo por defecto
+    enabled: false # Activar verificación automática
+    default_level: 1 # Nivel mínimo por defecto
+    max_level: 3 # Nivel máximo por defecto
 
   wolfram:
-    enabled: false                 # Activar fallback a Wolfram Alpha
+    enabled: false # Activar fallback a Wolfram Alpha
     timeout_seconds: 10
 
   latex_parser:
-    use_llm_normalization: true    # Usar LLM para normalizar LaTeX
-    confidence_threshold: 0.7      # Umbral mínimo de confianza
+    use_llm_normalization: true # Usar LLM para normalizar LaTeX
+    confidence_threshold: 0.7 # Umbral mínimo de confianza
 
   multi_agent:
-    enabled: false                 # Activar modo multi-agente (Fase 3)
-    max_steps: 10                  # Máx. pasos de derivación
-    provenance: true               # Registrar grafo PROV
+    enabled: false # Activar modo multi-agente (Fase 3)
+    max_steps: 10 # Máx. pasos de derivación
+    provenance: true # Registrar grafo PROV
 
   quantum:
-    enabled: true                  # Activar motor cuántico (Fase 4)
-    use_qutip: false               # Usar QuTiP (si instalado)
-    use_pennylane: false            # Usar PennyLane (si instalado)
+    enabled: true # Activar motor cuántico (Fase 4)
+    use_qutip: false # Usar QuTiP (si instalado)
+    use_pennylane: false # Usar PennyLane (si instalado)
 
   formula_graph:
-    enabled: false                 # Activar knowledge graph (Fase 5)
-    max_rewrite_steps: 10          # Máx. pasos de reescritura
+    enabled: false # Activar knowledge graph (Fase 5)
+    max_rewrite_steps: 10 # Máx. pasos de reescritura
 
   formal_verification:
-    enabled: false                 # Activar verificación formal (Fase 6)
-    lean_timeout_seconds: 60       # Timeout de compilación Lean
-    max_repair_attempts: 3         # Intentos de reparación con LLM
+    enabled: false # Activar verificación formal (Fase 6)
+    lean_timeout_seconds: 60 # Timeout de compilación Lean
+    max_repair_attempts: 3 # Intentos de reparación con LLM
 ```
 
 ### Variables de Entorno (`.env`)
 
 ```
-WOLFRAM_MCP_API_KEY="VJTQKPEQ7H"   # API key para Wolfram Alpha
+WOLFRAM_MCP_API_KEY="<tu-api-key>"   # API key para Wolfram Alpha (obtener en developer.wolframalpha.com)
 ```
 
 ---
@@ -747,11 +763,11 @@ WOLFRAM_MCP_API_KEY="VJTQKPEQ7H"   # API key para Wolfram Alpha
 
 ### Suite de Tests E2E
 
-| Archivo | Fases | Tests | Estado |
-|---------|-------|-------|--------|
-| `tests/test_e2e_phases_1_2.py` | 1-2 | 11 | 11/11 PASS |
-| `tests/test_e2e_phases_3_6.py` | 3-6 | 19 | 19/19 PASS |
-| **Total** | **1-6** | **30** | **30/30 PASS** |
+| Archivo                        | Fases   | Tests  | Estado         |
+| ------------------------------ | ------- | ------ | -------------- |
+| `tests/test_e2e_phases_1_2.py` | 1-2     | 11     | 11/11 PASS     |
+| `tests/test_e2e_phases_3_6.py` | 3-6     | 19     | 19/19 PASS     |
+| **Total**                      | **1-6** | **30** | **30/30 PASS** |
 
 ### Ejecutar Tests
 
@@ -771,11 +787,13 @@ python3 tests/test_e2e_phases_1_2.py && python3 tests/test_e2e_phases_3_6.py
 ### Cobertura por Fase
 
 **Fase 1** (3 tests):
+
 - MathEngine: 10 operaciones (solve, diff, integrate, simplify, verify, matrix, raw)
 - Orchestrator: extracción de `<COMPUTE>`, limpieza de respuesta
 - Loop E2E completo (extract → sandbox → result)
 
 **Fase 2** (5 tests):
+
 - VerificationPipeline: 6 verificaciones (trig, falsa, algebraica, unitary, hermitian, integrity)
 - LaTeXParser: 5 formatos (fracción, raíz, trig, polinomio, área)
 - WolframClient: query real a la API
@@ -783,6 +801,7 @@ python3 tests/test_e2e_phases_1_2.py && python3 tests/test_e2e_phases_3_6.py
 - Pipeline completo: LaTeX → parse → verify → artifact → serialize
 
 **Fase 3** (5 tests):
+
 - ProvenanceGraph: entidades, actividades, agentes, lineage
 - DerivationStep/Plan: estructura y serialización
 - CalculatorAgent: ejecución en sandbox
@@ -790,24 +809,28 @@ python3 tests/test_e2e_phases_1_2.py && python3 tests/test_e2e_phases_3_6.py
 - MultiAgentOrchestrator: pipeline completo sin LLM
 
 **Fase 4** (4 tests):
+
 - 10 puertas cuánticas (H, X, Y, Z, S, T, CNOT, CZ, SWAP, QFT)
 - Operaciones: conmutador, anticonmutador, tensor, apply_gate, measure
 - Verificación: unitariedad, hermiticidad
 - Entropía de von Neumann: S(|0⟩⟨0|)=0, S(I/2)=1
 
 **Fase 5** (4 tests):
+
 - Fingerprinting invariante bajo renombramiento de variables
 - Equivalencia simbólica (trigsimp, expand)
 - FormulaGraph: nodos, aristas, reglas, deduplicación, búsqueda
 - Reglas de reescritura: aplicación sin loops infinitos
 
 **Fase 6** (4 tests):
+
 - LeanInterface: detección de disponibilidad
 - Autoformalizator: templates sin LLM
 - FormalVerifier: pipeline con degradación graceful
 - LeanResult: estructura de datos
 
 **Integración** (2 tests):
+
 - Quantum + Verification: invariantes cuánticos con VerificationPipeline
 - Pipeline completo Fases 3-6: multi-agente + quantum + formula graph + formal
 
@@ -816,15 +839,19 @@ python3 tests/test_e2e_phases_1_2.py && python3 tests/test_e2e_phases_3_6.py
 ## Patrones de Diseño
 
 ### 1. Ejecución en Sandbox
+
 Toda ejecución de código se realiza en un `CodeSandbox` aislado con:
+
 - Timeout configurable
 - Sin acceso a red
 - Builtins peligrosos bloqueados (`type()`, `__class__`)
 - Resultados extraídos vía delimitadores `__MATH_RESULT__`
 
 ### 2. Inicialización Lazy
+
 Los motores pesados (Wolfram, Quantum, FormalVerifier) se cargan bajo demanda
 usando `@property` con inicialización diferida:
+
 ```python
 @property
 def quantum(self):
@@ -835,23 +862,29 @@ def quantum(self):
 ```
 
 ### 3. Verificación Dual
+
 Las ecuaciones se verifican tanto simbólica como numéricamente para maximizar
 la confianza (sampling + transforms específicos).
 
 ### 4. Degradación Graceful
+
 Si un componente externo no está disponible (Lean 4, Wolfram, QuTiP),
 el sistema se degrada al siguiente mejor nivel de verificación sin fallar.
 
 ### 5. Provenance Tracing
+
 Cada afirmación computacional se puede trazar hasta su fuente original
 mediante el grafo W3C PROV.
 
 ### 6. Estrategia SMART
+
 "Reason first, verify with tools second" — el LLM razona primero y usa
 herramientas computacionales para verificar, evitando Tool-Induced Myopia.
 
 ### 7. Dual-Source Grounding
+
 Las respuestas se sustentan en dos fuentes independientes:
+
 - Citas textuales `[n]` del corpus
 - Evidencia computacional (MathArtifacts)
 
@@ -859,13 +892,13 @@ Las respuestas se sustentan en dos fuentes independientes:
 
 ## Limitaciones y Restricciones del Sandbox
 
-| Restricción | Detalle | Workaround |
-|-------------|---------|------------|
-| `type()` bloqueado | En la lista `DANGEROUS_BUILTINS` | Usar `isinstance()` o `srepr()` + regex |
-| `__class__` bloqueado | En `DANGEROUS_ATTRS` | Usar `.__class__.__name__` vía `srepr()` |
-| Sin acceso a red | Sandbox aislado | Wolfram se ejecuta fuera del sandbox |
-| matplotlib puede crashear | Incompatibilidad NumPy 2.x | Envuelto en try/except |
-| Warnings de recursión | `tree_depth()` recursiva | Son warnings, no errores |
-| `pip` requiere flag | Ubuntu system packages | `--break-system-packages` |
-| `python` no existe | Solo `python3` en Ubuntu | Siempre usar `python3` |
-| f-strings en código generado | Variables evaluadas en scope incorrecto | Usar `{{var}}` para doble escape |
+| Restricción                  | Detalle                                 | Workaround                               |
+| ---------------------------- | --------------------------------------- | ---------------------------------------- |
+| `type()` bloqueado           | En la lista `DANGEROUS_BUILTINS`        | Usar `isinstance()` o `srepr()` + regex  |
+| `__class__` bloqueado        | En `DANGEROUS_ATTRS`                    | Usar `.__class__.__name__` vía `srepr()` |
+| Sin acceso a red             | Sandbox aislado                         | Wolfram se ejecuta fuera del sandbox     |
+| matplotlib puede crashear    | Incompatibilidad NumPy 2.x              | Envuelto en try/except                   |
+| Warnings de recursión        | `tree_depth()` recursiva                | Son warnings, no errores                 |
+| `pip` requiere flag          | Ubuntu system packages                  | `--break-system-packages`                |
+| `python` no existe           | Solo `python3` en Ubuntu                | Siempre usar `python3`                   |
+| f-strings en código generado | Variables evaluadas en scope incorrecto | Usar `{{var}}` para doble escape         |

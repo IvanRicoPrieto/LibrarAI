@@ -13,10 +13,22 @@ from ._types import LLMResponse, LLMProviderError
 
 logger = logging.getLogger(__name__)
 
-# Singletons de clientes (se crean en el primer uso)
-_claude_max_instance = None
-_openai_instance = None
-_anthropic_instance = None
+class _LLMRegistry:
+    """Registry de clientes LLM con lazy initialization.
+
+    Encapsula los singletons en una clase para evitar variables globales mutables.
+    Permite reset para testing.
+    """
+    claude_max = None
+    openai = None
+    anthropic = None
+
+    @classmethod
+    def reset(cls):
+        """Reset all clients (útil para testing)."""
+        cls.claude_max = None
+        cls.openai = None
+        cls.anthropic = None
 
 
 def _complete_claude_max(
@@ -29,8 +41,6 @@ def _complete_claude_max(
     stream_callback: Callable[[str], None] | None,
 ) -> LLMResponse:
     """Backend: ClaudeMaxClient via suscripcion Claude Code Max."""
-    global _claude_max_instance
-
     try:
         from src.claude_max_client import ClaudeMaxClient
     except ImportError as e:
@@ -39,16 +49,16 @@ def _complete_claude_max(
             "Verifica que src/claude_max_client/ existe y claude-agent-sdk esta instalado."
         ) from e
 
-    if _claude_max_instance is None:
+    if _LLMRegistry.claude_max is None:
         defaults = get_defaults(Provider.CLAUDE_MAX)
-        _claude_max_instance = ClaudeMaxClient(
+        _LLMRegistry.claude_max = ClaudeMaxClient(
             model=defaults["model"],
             default_temperature=defaults["temperature"],
             default_max_tokens=defaults["max_tokens"],
         )
 
     try:
-        resp = _claude_max_instance.complete(
+        resp = _LLMRegistry.claude_max.complete(
             prompt=prompt,
             system=system,
             temperature=temperature,
@@ -87,8 +97,6 @@ def _complete_openai_api(
     """Backend: OpenAI API (pago por token)."""
     import os
 
-    global _openai_instance
-
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise LLMProviderError(
@@ -102,8 +110,8 @@ def _complete_openai_api(
             "Paquete 'openai' no instalado. Ejecuta: pip install openai"
         ) from e
 
-    if _openai_instance is None:
-        _openai_instance = OpenAI(api_key=api_key)
+    if _LLMRegistry.openai is None:
+        _LLMRegistry.openai = OpenAI(api_key=api_key)
 
     defaults = get_defaults(Provider.OPENAI_API)
     model = defaults["model"]
@@ -127,7 +135,7 @@ def _complete_openai_api(
     try:
         if stream and stream_callback:
             kwargs["stream"] = True
-            resp = _openai_instance.chat.completions.create(**kwargs)
+            resp = _LLMRegistry.openai.chat.completions.create(**kwargs)
             content_parts: list[str] = []
             for chunk in resp:
                 if chunk.choices[0].delta.content:
@@ -138,7 +146,7 @@ def _complete_openai_api(
             tokens_in = len(prompt) // 4
             tokens_out = len(content) // 4
         else:
-            resp = _openai_instance.chat.completions.create(**kwargs)
+            resp = _LLMRegistry.openai.chat.completions.create(**kwargs)
             content = resp.choices[0].message.content or ""
             tokens_in = resp.usage.prompt_tokens if resp.usage else len(prompt) // 4
             tokens_out = resp.usage.completion_tokens if resp.usage else len(content) // 4
@@ -169,8 +177,6 @@ def _complete_anthropic_api(
     """Backend: Anthropic API (pago por token)."""
     import os
 
-    global _anthropic_instance
-
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise LLMProviderError(
@@ -184,8 +190,8 @@ def _complete_anthropic_api(
             "Paquete 'anthropic' no instalado. Ejecuta: pip install anthropic"
         ) from e
 
-    if _anthropic_instance is None:
-        _anthropic_instance = Anthropic(api_key=api_key)
+    if _LLMRegistry.anthropic is None:
+        _LLMRegistry.anthropic = Anthropic(api_key=api_key)
 
     defaults = get_defaults(Provider.ANTHROPIC_API)
     model = defaults["model"]
@@ -204,7 +210,7 @@ def _complete_anthropic_api(
 
     try:
         if stream and stream_callback:
-            with _anthropic_instance.messages.stream(
+            with _LLMRegistry.anthropic.messages.stream(
                 model=model,
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -221,7 +227,7 @@ def _complete_anthropic_api(
             tokens_in = final.usage.input_tokens
             tokens_out = final.usage.output_tokens
         else:
-            resp = _anthropic_instance.messages.create(
+            resp = _LLMRegistry.anthropic.messages.create(
                 model=model,
                 max_tokens=max_tokens,
                 temperature=temperature,

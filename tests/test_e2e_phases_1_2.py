@@ -14,6 +14,8 @@ import json
 import time
 from pathlib import Path
 
+import pytest
+
 # Asegurar que src está en path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -31,6 +33,7 @@ if _env_file.exists():
                     os.environ[_key] = _val
 
 
+@pytest.mark.e2e
 def test_math_engine_all_operations():
     """E2E: MathEngine ejecuta todas las operaciones en sandbox real."""
     from src.math.engine import MathEngine
@@ -97,9 +100,9 @@ def test_math_engine_all_operations():
     print(f"MathEngine: 10/10 operaciones OK")
     for k, v in results.items():
         print(f"  {k}: {v[:80]}")
-    return True
 
 
+@pytest.mark.e2e
 def test_verification_pipeline():
     """E2E: VerificationPipeline verifica identidades a múltiples niveles."""
     from src.math.verification import VerificationPipeline
@@ -148,9 +151,9 @@ def test_verification_pipeline():
     print(f"VerificationPipeline: 6/6 tests OK")
     for k, v in results.items():
         print(f"  {k}: {v}")
-    return True
 
 
+@pytest.mark.e2e
 def test_latex_parser():
     """E2E: LaTeXParser convierte LaTeX a SymPy con confianza."""
     from src.math.latex_parser import LaTeXParser
@@ -175,17 +178,16 @@ def test_latex_parser():
     print(f"LaTeXParser: {len(cases)}/{len(cases)} tests OK")
     for k, v in results.items():
         print(f"  {k}: {v}")
-    return True
 
 
+@pytest.mark.e2e
 def test_wolfram_client():
     """E2E: WolframClient consulta Wolfram Alpha API."""
     from src.math.wolfram_client import WolframClient
 
     client = WolframClient()
     if not client.available:
-        print("WolframClient: SKIP (API key no configurada)")
-        return True
+        pytest.skip("WolframClient: API key no configurada")
 
     r = client.query("integrate sin(x)^2 dx")
     assert r["success"], f"Wolfram query falló: {r['error']}"
@@ -194,9 +196,9 @@ def test_wolfram_client():
 
     print(f"WolframClient: OK ({r['execution_time_ms']:.0f}ms)")
     print(f"  Resultado: {r['result'][:100]}...")
-    return True
 
 
+@pytest.mark.e2e
 def test_math_artifact_serialization():
     """E2E: MathArtifact serialización completa."""
     from src.math.artifacts import MathArtifact, VerificationLevel
@@ -233,9 +235,9 @@ def test_math_artifact_serialization():
     print("MathArtifact serialización: OK")
     print(f"  Hash: {d['content_hash']}")
     print(f"  Evidence block: {block[:80]}...")
-    return True
 
 
+@pytest.mark.e2e
 def test_orchestrator_compute_extraction():
     """E2E: Orchestrator extrae bloques <COMPUTE> correctamente."""
     from src.math.orchestrator import MathComputationOrchestrator
@@ -289,9 +291,9 @@ print(sp.integrate(sp.cos(sp.Symbol('x')), sp.Symbol('x')))
 
     print("Orchestrator compute extraction: OK")
     print(f"  Test 1: {len(blocks)} bloques extraídos")
-    return True
 
 
+@pytest.mark.e2e
 def test_orchestrator_clean_response():
     """E2E: Orchestrator limpia respuesta final correctamente."""
     from src.math.orchestrator import MathComputationOrchestrator
@@ -328,9 +330,9 @@ Por lo tanto, la integral es -cos(x) + C."""
     assert "integral" in cleaned.lower()
 
     print("Orchestrator clean response: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_engine_with_quantum():
     """E2E: MathEngine con operaciones cuánticas (matrices Pauli, QFT)."""
     from src.math.engine import MathEngine
@@ -376,9 +378,9 @@ print(f"QFT matrix:\\n{QFT}")
     print(f"  QFT 2-qubit: {r.stdout.strip()[:100]}")
 
     print("Engine quantum operations: OK")
-    return True
 
 
+@pytest.mark.e2e
 def test_citation_injector_with_math():
     """E2E: CitationInjector con evidencia computacional."""
     from src.generation.citation_injector import CitationInjector, CitedResponse
@@ -420,9 +422,9 @@ def test_citation_injector_with_math():
 
     print("CitationInjector with math: OK")
     print(f"  Full response excerpt: {full[:150]}...")
-    return True
 
 
+@pytest.mark.e2e
 def test_end_to_end_compute_loop():
     """
     E2E: Loop completo de computación (sin LLM real).
@@ -485,9 +487,9 @@ Esto confirma que la identidad es correcta."""
 
     print("E2E compute loop: OK")
     print(f"  Sandbox output: {output[:100]}")
-    return True
 
 
+@pytest.mark.e2e
 def test_full_pipeline_integration():
     """
     E2E: Pipeline completo desde input hasta MathArtifact.
@@ -530,59 +532,7 @@ def test_full_pipeline_integration():
     print(f"  Verification: PASS at level {artifact.verification_level.name}")
     print(f"  Artifact hash: {artifact.content_hash}")
     print("Full pipeline integration: OK")
-    return True
-
-
-# ============================================================
-# Runner
-# ============================================================
-
-def main():
-    tests = [
-        ("MathEngine operaciones", test_math_engine_all_operations),
-        ("VerificationPipeline", test_verification_pipeline),
-        ("LaTeXParser", test_latex_parser),
-        ("WolframClient", test_wolfram_client),
-        ("MathArtifact serialización", test_math_artifact_serialization),
-        ("Orchestrator extraction", test_orchestrator_compute_extraction),
-        ("Orchestrator clean", test_orchestrator_clean_response),
-        ("Engine quantum", test_engine_with_quantum),
-        ("CitationInjector+math", test_citation_injector_with_math),
-        ("E2E compute loop", test_end_to_end_compute_loop),
-        ("Full pipeline", test_full_pipeline_integration),
-    ]
-
-    passed = 0
-    failed = 0
-    skipped = 0
-
-    print("=" * 60)
-    print("TESTS E2E - FASES 1 Y 2")
-    print("=" * 60)
-
-    for name, test_fn in tests:
-        print(f"\n--- {name} ---")
-        try:
-            result = test_fn()
-            if result:
-                passed += 1
-                print(f"  => PASS")
-            else:
-                failed += 1
-                print(f"  => FAIL")
-        except Exception as e:
-            failed += 1
-            print(f"  => ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-
-    print(f"\n{'=' * 60}")
-    print(f"RESULTADOS: {passed} passed, {failed} failed, {skipped} skipped")
-    print(f"{'=' * 60}")
-
-    return failed == 0
 
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    pytest.main([__file__, "-v"])

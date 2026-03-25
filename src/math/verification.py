@@ -144,7 +144,7 @@ try:
         "lhs_dims": str(lhs_qty.dimensionality),
         "rhs_dims": str(rhs_qty.dimensionality),
     }}
-except Exception as e:
+except (ValueError, TypeError, pint.errors.DimensionalityError, pint.errors.UndefinedUnitError) as e:
     result = {{"passed": False, "conclusive": False, "error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -219,7 +219,7 @@ try:
             "failures": failures,
             "max_residual": float(max_residual),
         }}
-except Exception as e:
+except (ValueError, TypeError, ZeroDivisionError, OverflowError) as e:
     result = {{"passed": False, "conclusive": False, "error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -271,7 +271,7 @@ try:
                 passed = True
                 method_used = name
                 break
-        except Exception:
+        except (ValueError, TypeError):
             continue
 
     # Si ningún transform funciona, intentar como último recurso
@@ -280,7 +280,7 @@ try:
             if diff.equals(0):
                 passed = True
                 method_used = "equals"
-        except Exception:
+        except (ValueError, TypeError):
             pass
 
     result = {{
@@ -289,7 +289,7 @@ try:
         "method": method_used,
         "transforms_tried": [t[0] for t in transforms],
     }}
-except Exception as e:
+except (ValueError, TypeError) as e:
     result = {{"passed": False, "conclusive": False, "error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -367,7 +367,7 @@ try:
         "invariant": "{invariant_type}",
         "details": str(details),
     }}
-except Exception as e:
+except (ValueError, TypeError, AttributeError) as e:
     result = {{"passed": False, "conclusive": False, "error": str(e)}}
 
 print("__MATH_RESULT__")
@@ -418,7 +418,7 @@ print("__MATH_RESULT_END__")
                 "errors": proof.lean_result.errors if proof.lean_result else [],
                 "execution_time_ms": proof.lean_result.execution_time_ms if proof.lean_result else 0,
             }
-        except Exception as e:
+        except (ImportError, ValueError, TypeError, RuntimeError, OSError) as e:
             logger.warning(f"Verificación formal falló: {e}")
             return {"passed": False, "conclusive": False, "error": str(e)}
 

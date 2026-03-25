@@ -11,6 +11,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional, List, Tuple, Any, Dict
 
+from sympy import SympifyError
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,6 +58,22 @@ class MathEngine:
     RESULT_START = "__MATH_RESULT__"
     RESULT_END = "__MATH_RESULT_END__"
 
+    # Patrones peligrosos que no deberían aparecer en expresiones matemáticas
+    _DANGEROUS_PATTERNS = ['import ', 'exec(', 'eval(', '__', 'open(', 'os.', 'sys.', 'subprocess']
+
+    @staticmethod
+    def _sanitize_expr(expr: str) -> str:
+        """Sanitiza una expresión matemática antes de interpolarla en código sandbox.
+
+        Escapa comillas y valida que no contenga patrones de inyección de código.
+        Raises ValueError si detecta patrones peligrosos.
+        """
+        for pattern in MathEngine._DANGEROUS_PATTERNS:
+            if pattern in expr:
+                raise ValueError(f"Expresión rechazada: contiene patrón no permitido '{pattern}'")
+        # Escapar comillas para interpolación segura en strings Python
+        return expr.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'")
+
     def __init__(self, sandbox=None, timeout: int = 30):
         if sandbox is None:
             from ..execution.sandbox import CodeSandbox
@@ -69,22 +87,25 @@ class MathEngine:
         domain: str = "complex",
     ) -> MathResult:
         """Resuelve una ecuación simbólicamente."""
+        safe_eq = self._sanitize_expr(equation)
+        safe_var = self._sanitize_expr(variable)
         assumptions = self._domain_assumptions(domain)
         code = f'''
 import sympy as sp
+from sympy import SympifyError
 import json
 
-{variable} = sp.Symbol("{variable}"{', ' + assumptions if assumptions else ''})
+{safe_var} = sp.Symbol("{safe_var}"{', ' + assumptions if assumptions else ''})
 try:
-    expr = sp.sympify("{equation}")
-    solutions = sp.solve(expr, {variable})
+    expr = sp.sympify("{safe_eq}")
+    solutions = sp.solve(expr, {safe_var})
     result = {{
         "output_expr": str(solutions),
         "output_latex": sp.latex(solutions) if solutions else "",
         "numeric_value": [float(s.evalf()) for s in solutions if s.is_number] if isinstance(solutions, list) else None,
         "assumptions": ["{domain}"],
     }}
-except Exception as e:
+except (SympifyError, ValueError, TypeError) as e:
     result = {{"error": str(e)}}
 
 print("{self.RESULT_START}")
@@ -100,21 +121,24 @@ print("{self.RESULT_END}")
         order: int = 1,
     ) -> MathResult:
         """Calcula la derivada de una expresión."""
+        safe_expr = self._sanitize_expr(expr)
+        safe_var = self._sanitize_expr(variable)
         code = f'''
 import sympy as sp
+from sympy import SympifyError
 import json
 
-{variable} = sp.Symbol("{variable}")
+{safe_var} = sp.Symbol("{safe_var}")
 try:
-    expression = sp.sympify("{expr}")
-    derivative = sp.diff(expression, {variable}, {order})
+    expression = sp.sympify("{safe_expr}")
+    derivative = sp.diff(expression, {safe_var}, {order})
     result = {{
         "output_expr": str(derivative),
         "output_latex": sp.latex(derivative),
         "numeric_value": float(derivative.evalf()) if derivative.is_number else None,
         "assumptions": ["order={order}"],
     }}
-except Exception as e:
+except (SympifyError, ValueError, TypeError) as e:
     result = {{"error": str(e)}}
 
 print("{self.RESULT_START}")
@@ -130,18 +154,21 @@ print("{self.RESULT_END}")
         limits: Optional[Tuple] = None,
     ) -> MathResult:
         """Calcula integral definida o indefinida."""
+        safe_expr = self._sanitize_expr(expr)
+        safe_var = self._sanitize_expr(variable)
         if limits:
-            integral_call = f"sp.integrate(expression, ({variable}, {limits[0]}, {limits[1]}))"
+            integral_call = f"sp.integrate(expression, ({safe_var}, {limits[0]}, {limits[1]}))"
         else:
-            integral_call = f"sp.integrate(expression, {variable})"
+            integral_call = f"sp.integrate(expression, {safe_var})"
 
         code = f'''
 import sympy as sp
+from sympy import SympifyError
 import json
 
-{variable} = sp.Symbol("{variable}")
+{safe_var} = sp.Symbol("{safe_var}")
 try:
-    expression = sp.sympify("{expr}")
+    expression = sp.sympify("{safe_expr}")
     integral = {integral_call}
     result = {{
         "output_expr": str(integral),
@@ -149,7 +176,7 @@ try:
         "numeric_value": float(integral.evalf()) if integral.is_number else None,
         "assumptions": ["limits={limits}"] if {limits is not None} else ["indefinite"],
     }}
-except Exception as e:
+except (SympifyError, ValueError, TypeError) as e:
     result = {{"error": str(e)}}
 
 print("{self.RESULT_START}")
@@ -188,7 +215,7 @@ print("{self.RESULT_END}")
             if sp.count_ops(candidate) < sp.count_ops(simplified):
                 simplified = candidate
                 method_used = name
-        except Exception:
+        except (ValueError, TypeError):
             continue
 '''
         else:
@@ -197,12 +224,14 @@ print("{self.RESULT_END}")
     method_used = "{method}"
 '''
 
+        safe_expr = self._sanitize_expr(expr)
         code = f'''
 import sympy as sp
+from sympy import SympifyError
 import json
 
 try:
-    expression = sp.sympify("{expr}")
+    expression = sp.sympify("{safe_expr}")
 {simplify_code}
     result = {{
         "output_expr": str(simplified),
@@ -210,7 +239,7 @@ try:
         "numeric_value": float(simplified.evalf()) if simplified.is_number else None,
         "assumptions": ["method=" + method_used],
     }}
-except Exception as e:
+except (SympifyError, ValueError, TypeError) as e:
     result = {{"error": str(e)}}
 
 print("{self.RESULT_START}")
@@ -230,22 +259,26 @@ print("{self.RESULT_END}")
 
         Usa doble verificación: simbólica (transforms) + numérica (sampling).
         """
+        safe_lhs = self._sanitize_expr(lhs)
+        safe_rhs = self._sanitize_expr(rhs)
         vars_decl = ""
         if variables:
             for v in variables:
-                vars_decl += f'{v} = sp.Symbol("{v}")\n'
+                safe_v = self._sanitize_expr(v)
+                vars_decl += f'{safe_v} = sp.Symbol("{safe_v}")\n'
         else:
             vars_decl = 'x, y, z = sp.symbols("x y z")\n'
 
         code = f'''
 import sympy as sp
+from sympy import SympifyError
 import numpy as np
 import json
 
 {vars_decl}
 try:
-    left = sp.sympify("{lhs}")
-    right = sp.sympify("{rhs}")
+    left = sp.sympify("{safe_lhs}")
+    right = sp.sympify("{safe_rhs}")
     diff = sp.expand(left - right)
 
     # Verificación simbólica: intentar transforms específicos
@@ -258,7 +291,7 @@ try:
                 symbolic_equal = True
                 method_used = name
                 break
-        except Exception:
+        except (ValueError, TypeError):
             continue
 
     # Verificación numérica: sampling aleatorio
@@ -286,7 +319,7 @@ try:
         "assumptions": [f"symbolic_check={{symbolic_equal}} ({{method_used}})", f"numeric_check={{numeric_equal}}"],
         "verified": verified,
     }}
-except Exception as e:
+except (SympifyError, ValueError, TypeError) as e:
     result = {{"error": str(e), "verified": False}}
 
 print("{self.RESULT_START}")
@@ -321,10 +354,12 @@ print("{self.RESULT_END}")
                 input_expr=matrix_expr, error=f"Operación no soportada: {operation}"
             )
 
-        op_code = op_map[operation].format(matrix=matrix_expr)
+        safe_matrix = self._sanitize_expr(matrix_expr)
+        op_code = op_map[operation].format(matrix=safe_matrix)
 
         code = f'''
 import sympy as sp
+from sympy import SympifyError
 import json
 
 try:
@@ -335,7 +370,7 @@ try:
         "numeric_value": None,
         "assumptions": ["operation={operation}"],
     }}
-except Exception as e:
+except (SympifyError, ValueError, TypeError) as e:
     result = {{"error": str(e)}}
 
 print("{self.RESULT_START}")

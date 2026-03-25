@@ -51,7 +51,7 @@
 | Motor Matemático       |   ✅   | 6 fases: sandbox, verificación, multi-agente, quantum, KG, Lean 4 |
 | Dockerización          |   ✅   | docker-compose con Qdrant + App            |
 | Logging Estructurado   |   ✅   | structlog con tracing                      |
-| Tests                  |   ✅   | 96 tests pasando (66 core + 30 math E2E)  |
+| Tests                  |   ✅   | 390 funciones de test en 22 archivos  |
 
 ---
 
@@ -103,7 +103,7 @@
 | -------------------------- | -------------------------------------------- |
 | **Dockerización**          | docker-compose con Qdrant, App y Sandbox     |
 | **Logging Estructurado**   | structlog con JSON/console, trace context    |
-| **Tests**                  | 96 tests (66 core + 30 math E2E)             |
+| **Tests**                  | 390 funciones de test en 22 archivos         |
 | **Memoria Conversacional** | Sesiones persistentes, detección de followup |
 
 ---
@@ -208,7 +208,7 @@
 | ------------ | ----------------------- | ------------------------------- |
 | Contenedores | Docker + Compose        | Qdrant, App, Sandbox aislado    |
 | Logging      | structlog               | JSON/console, trace correlation |
-| Testing      | pytest + pytest-asyncio | 96 tests, fixtures compartidos  |
+| Testing      | pytest + pytest-asyncio | 390 tests, fixtures compartidos |
 | Cache        | SQLite + LRU            | Persistente en disco            |
 
 ---
@@ -775,7 +775,7 @@ LibrarAI es un sistema RAG completo y robusto que combina:
 - **Optimización de costes:** Múltiples capas de caché (70-90% ahorro)
 - **Verificación de calidad:** RAGAS + Critic + validación de citas
 - **Computación matemática verificada:** Motor de 6 fases con sandbox, verificación multi-nivel, multi-agente, computación cuántica, knowledge graph de fórmulas y verificación formal
-- **Robustez operacional:** Docker, logging estructurado, 96 tests
+- **Robustez operacional:** Docker, logging estructurado, 390 tests
 
 El sistema está listo para uso en producción como asistente de investigación para bibliotecas técnicas de Física, Matemáticas y Computación Cuántica.
 
