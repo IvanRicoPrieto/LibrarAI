@@ -187,7 +187,7 @@ def cmd_stats(args):
 
         collection_info = client.get_collection("quantum_library")
         stats["qdrant"] = {
-            "vectors_count": collection_info.vectors_count,
+            "vectors_count": getattr(collection_info, "vectors_count", None) or collection_info.points_count,
             "points_count": collection_info.points_count,
         }
     except Exception as e:

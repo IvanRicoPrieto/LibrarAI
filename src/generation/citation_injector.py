@@ -8,7 +8,7 @@ Funcionalidades:
 - Generación de footnotes
 """
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass, field
 import re
 import logging
@@ -60,13 +60,27 @@ class CitedResponse:
     citations: List[Citation]
     bibliography: str  # Referencias al final
     uncited_sources: List[str]  # Fuentes no citadas
-    
+    math_evidence: List[Dict[str, Any]] = field(default_factory=list)  # Evidencia computacional
+
     def get_full_response(self) -> str:
-        """Obtiene respuesta completa con bibliografía."""
-        if not self.citations:
-            return self.content
-        
-        return f"{self.content}\n\n---\n\n**Referencias:**\n{self.bibliography}"
+        """Obtiene respuesta completa con bibliografía y evidencia computacional."""
+        parts = [self.content]
+
+        if self.math_evidence:
+            evidence_lines = []
+            for ev in self.math_evidence:
+                status = "PASS" if ev.get("verification_passed") else "FAIL"
+                level = ev.get("verification_level", "NONE")
+                op = ev.get("operation", "")
+                result_latex = ev.get("result_latex", ev.get("result", ""))
+                line = f"- `{op}`: ${result_latex}$ [{status}, nivel: {level}]"
+                evidence_lines.append(line)
+            parts.append("\n\n---\n\n**Verificaciones computacionales:**\n" + "\n".join(evidence_lines))
+
+        if self.citations:
+            parts.append(f"\n\n---\n\n**Referencias:**\n{self.bibliography}")
+
+        return "\n".join(parts)
 
 
 class CitationInjector:
@@ -354,5 +368,29 @@ class CitationInjector:
                 anchor = f"<a id='ref-{citation.index}'></a>"
                 entry = f"{anchor}**[{citation.index}]** {citation.doc_title} — _{citation.header_path}_"
                 text += f"\n{entry}"
-        
+
         return text
+
+    def process_response_with_math(
+        self,
+        response_text: str,
+        sources: List[RetrievalResult],
+        math_artifacts: List[Dict[str, Any]],
+    ) -> CitedResponse:
+        """
+        Procesa respuesta con citas textuales Y evidencia computacional.
+
+        Combina el grounding textual (citas [n]) con el grounding
+        computacional (MathArtifacts) para dual-source grounding.
+
+        Args:
+            response_text: Texto de la respuesta con citas [n]
+            sources: Fuentes de retrieval
+            math_artifacts: Lista de MathArtifact.to_dict()
+
+        Returns:
+            CitedResponse con ambos tipos de evidencia
+        """
+        cited = self.process_response(response_text, sources)
+        cited.math_evidence = math_artifacts or []
+        return cited

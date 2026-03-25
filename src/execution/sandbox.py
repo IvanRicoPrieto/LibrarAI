@@ -41,6 +41,9 @@ ALLOWED_IMPORTS = {
     "sympy",
     "math",
     "cmath",
+    "pint",              # Análisis dimensional
+    "mpmath",            # Precisión arbitraria
+    "latex2sympy2",      # Parsing LaTeX → SymPy
     
     # Visualización
     "matplotlib",
@@ -495,40 +498,47 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Redirigir matplotlib a Agg (sin display)
-import matplotlib
-matplotlib.use('Agg')
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+except (ImportError, Exception):
+    pass
 
 '''
             if capture_figures:
                 wrapper_code += '''
-import matplotlib.pyplot as plt
-import base64
-import io
-
 _sandbox_figures = []
+_matplotlib_available = False
+try:
+    import matplotlib.pyplot as plt
+    import base64
+    import io
+    _matplotlib_available = True
 
-# Hook para capturar figuras
-_original_show = plt.show
-def _capture_show(*args, **kwargs):
-    for fig_num in plt.get_fignums():
-        fig = plt.figure(fig_num)
-        buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-        buf.seek(0)
-        _sandbox_figures.append(base64.b64encode(buf.read()).decode('utf-8'))
-        plt.close(fig)
+    # Hook para capturar figuras
+    _original_show = plt.show
+    def _capture_show(*args, **kwargs):
+        for fig_num in plt.get_fignums():
+            fig = plt.figure(fig_num)
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            _sandbox_figures.append(base64.b64encode(buf.read()).decode('utf-8'))
+            plt.close(fig)
 
-plt.show = _capture_show
+    plt.show = _capture_show
+except (ImportError, Exception):
+    pass
 
 '''
-            
+
             wrapper_code += code
-            
+
             if capture_figures:
                 wrapper_code += '''
 
 # Capturar figuras pendientes
-if plt.get_fignums():
+if _matplotlib_available and plt.get_fignums():
     _capture_show()
 
 # Imprimir figuras como JSON al final
@@ -728,8 +738,35 @@ Responde SOLO con el código Python, sin explicaciones ni markdown."""
         
         # Ejecutar
         result = self.execute(code)
-        
+
         return code, result
+
+    def execute_math(self, code: str) -> tuple['SandboxResult', dict | None]:
+        """
+        Ejecuta código y extrae resultado matemático estructurado.
+
+        Busca delimitadores __MATH_RESULT__ / __MATH_RESULT_END__ en stdout
+        para parsear JSON estructurado (mismo patrón que __SANDBOX_FIGURES__).
+
+        Returns:
+            (sandbox_result, parsed_math_dict_or_none)
+        """
+        import json as _json
+
+        result = self.execute(code, capture_figures=True)
+        math_data = None
+
+        if result.success and "__MATH_RESULT__" in result.stdout:
+            try:
+                parts = result.stdout.split("__MATH_RESULT__")
+                json_str = parts[1].split("__MATH_RESULT_END__")[0].strip()
+                math_data = _json.loads(json_str)
+                # Limpiar stdout quitando los marcadores internos
+                result.stdout = parts[0].strip()
+            except (IndexError, _json.JSONDecodeError) as e:
+                logger.warning(f"Error parseando resultado matemático: {e}")
+
+        return result, math_data
 
 
 # Función helper para uso directo

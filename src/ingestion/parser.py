@@ -126,13 +126,28 @@ class MarkdownParser:
         )
     
     def _generate_doc_id(self, file_path: Path) -> str:
-        """Genera un ID único para el documento basado en su ruta."""
-        # Usar el nombre del archivo sin extensión, normalizado
+        """Genera un ID único para el documento basado en su ruta.
+
+        Incluye la carpeta de categoría (2 niveles arriba) cuando el nombre
+        del archivo coincide con su carpeta padre directa, para evitar
+        colisiones (ej: modelizacion/LibroBase/LibroBase.md vs
+        geometria_diferencial/LibroBase/LibroBase.md).
+        """
         name = file_path.stem
+        parent = file_path.parent.name  # carpeta del libro
+        grandparent = file_path.parent.parent.name  # carpeta de categoría
+
+        if parent.lower() == name.lower() and grandparent:
+            # El archivo tiene el mismo nombre que su carpeta → usar categoría
+            combined = f"{grandparent}_{name}"
+        elif parent.lower() != name.lower():
+            combined = f"{parent}_{name}"
+        else:
+            combined = name
         # Limpiar caracteres especiales
-        name = re.sub(r'[^\w\s-]', '', name)
-        name = re.sub(r'[-\s]+', '_', name)
-        return name.lower()[:50]
+        combined = re.sub(r'[^\w\s-]', '', combined)
+        combined = re.sub(r'[-\s]+', '_', combined)
+        return combined.lower()[:80]
     
     def _extract_title(self, content: str, file_path: Path) -> str:
         """Extrae el título del documento (primer H1 o nombre de archivo)."""

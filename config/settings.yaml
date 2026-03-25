@@ -223,6 +223,60 @@ code_execution:
     - "urllib"
 
 # -----------------------------------------------------------------------------
+# Computación Matemática (Motor Matemático)
+# -----------------------------------------------------------------------------
+math_computation:
+  enabled: true
+
+  # Loop de computación bidireccional (Fase 1)
+  max_iterations: 5              # Máx round-trips LLM ↔ sandbox
+  timeout_per_step_seconds: 30   # Timeout por ejecución individual
+
+  # Verificación multi-nivel (Fase 2)
+  verification:
+    enabled: false               # Activar para verificación automática
+    default_level: 1             # Nivel por defecto (0=dim, 1=num, 2=sym, 3=phys)
+    max_level: 3                 # Nivel máximo permitido
+
+  # Wolfram Alpha como fallback
+  wolfram:
+    enabled: false               # Activar para usar Wolfram API
+    timeout_seconds: 10
+    max_retries: 2
+
+  # Parser LaTeX → SymPy
+  latex_parser:
+    use_llm_normalization: true  # Usar LLM para normalizar LaTeX desordenado
+    confidence_threshold: 0.7    # Confianza mínima del parser
+
+  # Análisis dimensional
+  dimensional_analysis:
+    enabled: false               # Activar verificación dimensional con Pint
+
+  # Sistema multi-agente (Fase 3)
+  multi_agent:
+    enabled: false               # Activar para derivaciones multi-paso
+    max_steps: 10                # Máximo pasos por derivación
+    provenance: true             # Registrar grafo de provenance W3C PROV
+
+  # Computación cuántica (Fase 4)
+  quantum:
+    enabled: true                # Motor cuántico siempre disponible
+    use_qutip: false             # QuTiP para simulación numérica (si instalado)
+    use_pennylane: false         # PennyLane para circuitos (si instalado)
+
+  # Knowledge Graph Computacional (Fase 5)
+  formula_graph:
+    enabled: false               # Activar para fingerprinting y e-graphs
+    max_rewrite_steps: 10        # Máximo pasos de reescritura
+
+  # Verificación formal Lean 4 (Fase 6)
+  formal_verification:
+    enabled: false               # Activar si Lean 4 está instalado
+    lean_timeout_seconds: 60
+    max_repair_attempts: 3
+
+# -----------------------------------------------------------------------------
 # Configuración de Logging
 # -----------------------------------------------------------------------------
 logging:

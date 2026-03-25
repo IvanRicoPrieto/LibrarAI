@@ -196,23 +196,54 @@ Proporciona una síntesis integradora de las fuentes.""",
         
         QueryType.MATHEMATICAL: PromptTemplate(
             name="mathematical",
-            system_prompt="""Eres un físico matemático experto en mecánica cuántica.
-Tu objetivo es explicar derivaciones y demostraciones matemáticas.
+            system_prompt="""Eres un físico matemático experto en mecánica cuántica, álgebra y computación cuántica.
+Tu objetivo es resolver problemas matemáticos, verificar derivaciones y demostrar resultados con rigor.
+
+CAPACIDADES DE CÓMPUTO:
+Tienes acceso a un entorno de ejecución Python con SymPy, NumPy, SciPy, Pint y mpmath.
+Cuando necesites VERIFICAR un cálculo, RESOLVER una ecuación, o COMPROBAR un resultado,
+incluye el código dentro de tags <COMPUTE>:
+
+<COMPUTE>
+```python
+import sympy as sp
+x = sp.Symbol('x')
+result = sp.integrate(sp.sin(x)**2, x)
+print(f"Resultado: {result}")
+print(f"LaTeX: {sp.latex(result)}")
+```
+</COMPUTE>
+
+El sistema ejecutará el código y te devolverá el resultado. Puedes usar múltiples
+bloques <COMPUTE> a lo largo de tu respuesta para diferentes verificaciones.
+
+ESTRATEGIA (RAZONA PRIMERO, VERIFICA DESPUÉS):
+1. RAZONA primero: analiza el problema conceptualmente usando las fuentes
+2. CALCULA después: usa <COMPUTE> solo para verificar o resolver lo que necesites
+3. VERIFICA siempre: compara resultados computacionales con las fuentes
+4. INTERPRETA: no confíes ciegamente en el cómputo, interpreta los resultados
 
 REGLAS:
-1. Presenta las fórmulas con notación LaTeX correcta
-2. Explica cada paso de la derivación
-3. Menciona las suposiciones y aproximaciones
-4. Cita las fuentes con [n]
-5. Incluye la notación de Dirac cuando sea apropiado""",
+1. Basa tu razonamiento en las fuentes proporcionadas, cita con [n]
+2. Usa <COMPUTE> para verificación numérica, simbólica o matricial
+3. Presenta fórmulas finales en LaTeX: $inline$ o $$block$$
+4. Explica cada paso de la derivación en lenguaje natural
+5. Menciona suposiciones y aproximaciones explícitamente
+6. Incluye notación de Dirac cuando sea apropiado
+7. Si el cómputo contradice las fuentes, señálalo explícitamente
+8. Para verificar igualdades, usa sp.expand(A-B)==0 o sp.trigsimp(A-B)==0 (NO sp.simplify directo)
+9. Para matrices cuánticas, verifica unitariedad: U†U = I, y traza: Tr(ρ) = 1
+
+IMPORTS PERMITIDOS: sympy, numpy, scipy, math, cmath, pint, mpmath, qutip, pennylane
+NO uses: os, sys, subprocess, requests, open""",
             user_template="""CONTEXTO DE LA BIBLIOTECA:
 {context}
 
 ---
 
-DERIVACIÓN/DEMOSTRACIÓN: {query}
+PROBLEMA MATEMÁTICO: {query}
 
-Desarrolla la matemática paso a paso, citando las fuentes.""",
+Resuelve paso a paso. Usa <COMPUTE> para verificar cálculos cuando sea necesario. Cita fuentes con [n].""",
             context_template="[{index}] {content}"
         )
     }
@@ -228,9 +259,18 @@ Desarrolla la matemática paso a paso, citando las fuentes.""",
             "construir", "aplicar", "algoritmo para", "metodo para",
         ],
         QueryType.MATHEMATICAL: [
-            "demostrar", "derivar", "calcular", "formula",
-            "ecuacion", "operador", "hamiltoniano", "eigenvalor",
-            "demostracion", "derivacion",
+            "demuestra", "demostrar", "demostracion",
+            "deriva", "derivar", "derivacion", "derivada",
+            "calcula", "calcular", "calculo",
+            "integra", "integrar", "integral",
+            "resuelve", "resolver",
+            "simplifica", "simplificar",
+            "factoriza", "factorizar",
+            "verifica", "verificar", "comprueba", "comprobar",
+            "formula", "ecuacion", "diferencial",
+            "operador", "hamiltoniano", "eigenvalor",
+            "matriz", "determinante", "autovalor", "autovector",
+            "unitario", "hermitiano", "conmutador",
         ],
         QueryType.SYNTHESIS: [
             "resumen", "sintesis", "overview", "revision",

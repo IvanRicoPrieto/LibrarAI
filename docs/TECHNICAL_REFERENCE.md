@@ -1,7 +1,7 @@
 # 📚 LibrarAI - Documentación Técnica del Sistema
 
 **Versión:** 2.0
-**Última actualización:** 7 de enero de 2026
+**Última actualización:** 25 de marzo de 2026
 **Estado:** ✅ Sistema completamente implementado y operativo
 
 ---
@@ -48,9 +48,10 @@
 | Filtrado Metadata      |   ✅   | Por categoría/dominio                      |
 | Chunking Semántico     |   ✅   | Detecta teoremas, definiciones, etc.       |
 | Code Sandbox           |   ✅   | Ejecución segura con validación AST        |
+| Motor Matemático       |   ✅   | 6 fases: sandbox, verificación, multi-agente, quantum, KG, Lean 4 |
 | Dockerización          |   ✅   | docker-compose con Qdrant + App            |
 | Logging Estructurado   |   ✅   | structlog con tracing                      |
-| Tests                  |   ✅   | 66 tests pasando                           |
+| Tests                  |   ✅   | 96 tests pasando (66 core + 30 math E2E)  |
 
 ---
 
@@ -102,7 +103,7 @@
 | -------------------------- | -------------------------------------------- |
 | **Dockerización**          | docker-compose con Qdrant, App y Sandbox     |
 | **Logging Estructurado**   | structlog con JSON/console, trace context    |
-| **Tests**                  | 66 tests unitarios + integración             |
+| **Tests**                  | 96 tests (66 core + 30 math E2E)             |
 | **Memoria Conversacional** | Sesiones persistentes, detección de followup |
 
 ---
@@ -207,7 +208,7 @@
 | ------------ | ----------------------- | ------------------------------- |
 | Contenedores | Docker + Compose        | Qdrant, App, Sandbox aislado    |
 | Logging      | structlog               | JSON/console, trace correlation |
-| Testing      | pytest + pytest-asyncio | 66 tests, fixtures compartidos  |
+| Testing      | pytest + pytest-asyncio | 96 tests, fixtures compartidos  |
 | Cache        | SQLite + LRU            | Persistente en disco            |
 
 ---
@@ -662,6 +663,19 @@ LibrarAI/
 │   ├── execution/             # Sandbox de código
 │   ├── generation/            # Prompt, Synthesizer
 │   ├── ingestion/             # Parser, Chunker, Indexer
+│   ├── math/                  # Motor matemático (6 fases)
+│   │   ├── engine.py          #   F1: MathEngine (sandbox SymPy)
+│   │   ├── orchestrator.py    #   F1: Loop <COMPUTE> (ToRA)
+│   │   ├── verification.py    #   F2: Pipeline 5 niveles
+│   │   ├── artifacts.py       #   F2: MathArtifact
+│   │   ├── latex_parser.py    #   F2: LaTeX → SymPy
+│   │   ├── wolfram_client.py  #   F2: Wolfram Alpha API
+│   │   ├── agents.py          #   F3: 4 agentes especializados
+│   │   ├── provenance.py      #   F3: W3C PROV graph
+│   │   ├── quantum.py         #   F4: Computación cuántica
+│   │   ├── formula_graph.py   #   F5: Knowledge graph fórmulas
+│   │   ├── formula_retriever.py # F5: Puente KG ↔ retrieval
+│   │   └── formal_verifier.py #   F6: Lean 4 integration
 │   ├── retrieval/             # Vector, BM25, Graph, Fusion
 │   └── utils/                 # Logging, Cost tracking
 ├── tests/                     # Suite de tests pytest
@@ -728,13 +742,24 @@ LibrarAI/
 ✅ Whitelist Sandbox Ampliada
 ✅ Validación AST
 
-### 13.2 Trabajo Futuro (TIER 5)
+### 13.2 Motor Matemático (TIER 5 — Completado)
+
+✅ Fase 1: Loop de computación bidireccional LLM ↔ Sandbox (ToRA)
+✅ Fase 2: Verificación multi-nivel (dimensional, numérico, simbólico, físico)
+✅ Fase 3: Sistema multi-agente (Planner/Calculator/Verifier/Synthesizer) + W3C PROV
+✅ Fase 4: Computación cuántica (puertas, conmutadores, entropía, fidelidad)
+✅ Fase 5: Knowledge graph de fórmulas (fingerprinting, e-graph, rewrite rules)
+✅ Fase 6: Verificación formal Lean 4 (autoformalization, repair loop, degradación graceful)
+✅ Integración completa en pipeline RAG (synthesizer dispatch, config-based)
+✅ 30 tests E2E pasando
+
+Ver documentación completa en [MOTOR_MATEMATICO.md](MOTOR_MATEMATICO.md).
+
+### 13.3 Trabajo Futuro
 
 |  #  | Mejora                 | Complejidad | Descripción                   |
 | :-: | ---------------------- | :---------: | ----------------------------- |
-| 21  | Indexación Math-Aware  | ⭐⭐⭐⭐⭐  | Parsear LaTeX semánticamente  |
 | 22  | GraphRAG LLM Completo  |  ⭐⭐⭐⭐   | Extracción LLM 100% de chunks |
-| 23  | Agente Tool Use        | ⭐⭐⭐⭐⭐  | Arquitectura agentic completa |
 | 24  | Fine-tuning Embeddings | ⭐⭐⭐⭐⭐  | Adaptar embeddings al dominio |
 | 25  | Neo4j                  |  ⭐⭐⭐⭐   | Migrar grafo a Neo4j          |
 
@@ -749,10 +774,11 @@ LibrarAI es un sistema RAG completo y robusto que combina:
 - **Recuperación de alta precisión:** Búsqueda híbrida + re-ranking + HyDE
 - **Optimización de costes:** Múltiples capas de caché (70-90% ahorro)
 - **Verificación de calidad:** RAGAS + Critic + validación de citas
-- **Robustez operacional:** Docker, logging estructurado, tests
+- **Computación matemática verificada:** Motor de 6 fases con sandbox, verificación multi-nivel, multi-agente, computación cuántica, knowledge graph de fórmulas y verificación formal
+- **Robustez operacional:** Docker, logging estructurado, 96 tests
 
 El sistema está listo para uso en producción como asistente de investigación para bibliotecas técnicas de Física, Matemáticas y Computación Cuántica.
 
 ---
 
-_Última actualización: 7 de enero de 2026_
+_Última actualización: 25 de marzo de 2026_

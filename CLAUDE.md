@@ -10,8 +10,8 @@ python -m src.cli.librari stats
 ```
 
 **Output actual**:
-- 58,828 chunks indexados (con metadatos de dificultad y términos matemáticos)
-- 59 documentos (libros/papers)
+- 88,676 chunks indexados (con metadatos de dificultad y términos matemáticos)
+- 110 documentos (libros/papers)
 - Knowledge graph disponible
 - Índices BM25 y vectoriales activos
 
@@ -180,7 +180,7 @@ print(f"Status: {verify.status.value}, Confianza: {verify.confidence}")
 
 ## Estructura de la biblioteca
 
-La biblioteca contiene 59 documentos con 58,828 fragmentos indexados, incluyendo:
+La biblioteca contiene 110 documentos con 88,676 fragmentos indexados, incluyendo:
 - Nielsen & Chuang - Quantum Computation
 - Watrous - Theory of Quantum Information
 - Wilde - Quantum Information Theory
